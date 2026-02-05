@@ -1,0 +1,59 @@
+[33mcommit 27ac4b25c39d8f1919480a6943386fb6aaba4b32[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmanu_branch[m[33m, [m[1;31morigin/yoann_branch[m[33m, [m[1;31morigin/manu_branch[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Wed Feb 4 21:47:36 2026 +0100
+
+    modif du 4 février
+
+[33mcommit 09e73978e64f69ffb7de5ac996ed7b7a6aca970d[m[33m ([m[1;32myoann_branch[m[33m)[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Mon Feb 2 23:10:58 2026 +0100
+
+    requirements
+
+[33mcommit b0e2df644417626271c2d912a5b27be5ad841157[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Mon Feb 2 22:25:29 2026 +0100
+
+     suppression des fichiers
+
+[33mcommit ef2c2403bf56811e29d85b2ae215f05a942bfb57[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Mon Feb 2 22:15:00 2026 +0100
+
+    reprise projet
+
+[33mcommit 797f68203cf2ac85115f433757f023e2a2f1812b[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:31:33 2025 +0100
+
+    ajout des constantes pour le filtre
+
+[33mcommit b19afb4b7b92767ce3622d7a5330a96544a8ac32[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:29:57 2025 +0100
+
+    ajout de la méthode dijkstra
+
+[33mcommit 12b65342e2fa2f3801a879be1e913062384664ad[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:24:53 2025 +0100
+
+    méthodes dans loader  + converters
+
+[33mcommit 79067280f92fc78be000584f1c72b27fbf3094c9[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:18:18 2025 +0100
+
+    scripts de sauvegarde de la db
+
+[33mcommit d2b076b08949949855061c2c09920879968041e5[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:16:32 2025 +0100
+
+    implementation de l'architecture
+
+[33mcommit adfd42a327861c454af50e28991f34ce8d741054[m
+Author: Yoann <rabahiyoann@gmail.com>
+Date:   Sun Dec 14 16:04:08 2025 +0100
+
+    first commit
