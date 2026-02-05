@@ -67,17 +67,7 @@ with st.sidebar:
                 )
 
             else:
-                import networkx as nx
-                G = nx.MultiDiGraph()
-                np.random.seed(42)
-                for i in range(30):
-                    G.add_node(i, x=float(np.random.rand()*100), y=float(np.random.rand()*100))
-                for i in range(29):
-                    G.add_edge(i, i+1, 0, length=float(np.random.rand()*10))
-                for _ in range(20):
-                    u, v = np.random.randint(0, 30, 2)
-                    if u != v:
-                        G.add_edge(int(u), int(v), 0, length=float(np.random.rand()*10))
+                G = create_french_cities_graph()
                 st.session_state.graph = G
 
             st.success("✅ Graphe chargé")
