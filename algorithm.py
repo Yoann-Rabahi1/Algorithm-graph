@@ -213,3 +213,4 @@ def prim_osmnx(G, start, weight="length"):
                 heapq.heappush(pq, (w_new, v, x))
 
     return mst_edges, total_cost
+

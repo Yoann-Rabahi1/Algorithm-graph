@@ -495,3 +495,5 @@ def plot_final_path(G, step, start, end):
         height=600
     )
     return fig
+
+
