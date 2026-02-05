@@ -143,16 +143,16 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
 
         if n == current:
             node_color.append("yellow")
-            node_size.append(45)
+            node_size.append(55)
         elif n == start:
             node_color.append("green")
-            node_size.append(40)
+            node_size.append(50)
         elif n == end:
             node_color.append("red")
-            node_size.append(40)
+            node_size.append(50)
         else:
             node_color.append("blue")
-            node_size.append(38)
+            node_size.append(48)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -160,7 +160,7 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
         text=labels if is_test_graph else None,
         textposition="middle center",
         marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
-        textfont=dict(size=9, color="white", family="Arial Black"),
+        textfont=dict(size=11, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 
@@ -170,6 +170,7 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
+        plot_bgcolor="lightblue",
         height=600
     )
     return fig
@@ -208,7 +209,7 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
     all_edge_trace = go.Scatter(
         x=all_edge_x, y=all_edge_y,
         mode="lines",
-        line=dict(width=0.5, color="#e0e0e0"),
+        line=dict(width=3, color="#e0e0e0"),
         hoverinfo="none"
     )
 
@@ -237,16 +238,16 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
 
         if n == start:
             node_color.append("green")
-            node_size.append(45)
+            node_size.append(55)
         elif n == end:
             node_color.append("red")
-            node_size.append(45)
+            node_size.append(55)
         elif n in path:
             node_color.append("lightgreen")
-            node_size.append(40)
+            node_size.append(55)
         else:
-            node_color.append("lightblue")
-            node_size.append(35)
+            node_color.append("black")
+            node_size.append(55)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -256,9 +257,9 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
         marker=dict(
             size=node_size,
             color=node_color,
-            line=dict(width=2, color="white")
+            line=dict(width=4, color="white")
         ),
-        textfont=dict(size=9, color="white", family="Arial Black"),
+        textfont=dict(size=11, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 
@@ -268,6 +269,7 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
+        plot_bgcolor="lightblue",
         height=600
     )
 

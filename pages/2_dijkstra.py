@@ -340,6 +340,35 @@ if st.session_state.graph is not None:
             is_test_graph=st.session_state.is_test_graph
         )
         graph_placeholder.plotly_chart(fig, use_container_width=True)
+
+        # -----------------------------------------------------------
+    # Affichage des résultats quand l'algorithme est terminé
+    # -----------------------------------------------------------
+    if st.session_state.finished:
+
+        current_step = st.session_state.steps[-1]
+
+        # Vérifier si la distance vers la cible existe
+        if st.session_state.end_node in current_step["dist"]:
+            dist = current_step["dist"][st.session_state.end_node]
+
+            if dist != float('inf'):
+                st.success(f"🎉 **Chemin trouvé !** Distance totale : **{dist:.2f} mètres**")
+
+                # Reconstruction du chemin
+                path = []
+                node = st.session_state.end_node
+                while node is not None:
+                    path.append(node)
+                    node = current_step["parent"].get(node)
+                path.reverse()
+
+                if len(path) > 1:
+                    st.info(f"📍 Nombre de nœuds dans le chemin : {len(path)}")
+
+            else:
+                st.error("❌ Aucun chemin trouvé entre les deux points")
+
     
     # MODE 4 : Graphe brut
     else:
