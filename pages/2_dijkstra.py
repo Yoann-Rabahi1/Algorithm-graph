@@ -3,10 +3,26 @@ import numpy as np
 import streamlit as st
 import time
 from plotly_graph import *
-from download_graph import *  # contient get_graph() et create_french_cities_graph()
+from download_graph import *  
+from dijkstra_functions import *
 
 st.set_page_config(page_title="Parcours de Graphes - Dijkstra", layout="wide")
 st.title("🗺️ Visualisation de l'algorithme de Dijkstra")
+
+st.markdown("""
+Bienvenue dans cet espace dédié à l'exploration interactive de **l'algorithme de Dijkstra**.
+
+Cette page te permet de :
+
+- **Charger un graphe** (réel via OpenStreetMap ou un graphe de test)
+- **Choisir un point de départ et d'arrivée**
+- **Observer pas à pas** comment Dijkstra explore le réseau
+- **Visualiser les distances, les nœuds visités et le chemin final**
+- Comprendre intuitivement **comment l’algorithme trouve le plus court chemin**
+
+L’objectif est de rendre l’algorithme **visuel, pédagogique et manipulable**, afin que tu puisses analyser son comportement sur des graphes simples comme sur des réseaux routiers réels.
+""")
+
 
 # Initialisation des variables de session
 if 'paused' not in st.session_state:
@@ -288,7 +304,7 @@ if st.session_state.graph is not None:
             current_step = st.session_state.steps[min(st.session_state.step_index, len(st.session_state.steps)-1)]
             
             if st.session_state.finished:
-                fig = plot_final_path(
+                fig = plot_final_path_dijkstra(
                     st.session_state.graph,
                     current_step,
                     st.session_state.start_node,
