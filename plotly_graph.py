@@ -1,254 +1,257 @@
-import plotly.graph_objects as go
 import heapq
+import plotly.graph_objects as go
+import networkx as nx
+
 
 # ---------------------------------------------------------
-# Affichage simple du graphe (tous les nœuds visibles)
+# Affichage simple du graphe
 # ---------------------------------------------------------
-def plot_graph_plotly(G):
-    """
-    Affiche le graphe complet avec tous les nœuds et arêtes
-    """
-    nodes = G.nodes(data=True)
+def plot_graph_plotly(G, is_test_graph=False):
 
-    edge_x = []
-    edge_y = []
+    if all('x' in G.nodes[n] and 'y' in G.nodes[n] for n in G.nodes()):
+        pos = {n: (G.nodes[n]['x'], G.nodes[n]['y']) for n in G.nodes()}
+    else:
+        pos = nx.spring_layout(G, seed=42)
+
+    edge_x, edge_y, edge_labels = [], [], []
 
     for u, v, data in G.edges(data=True):
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
+        x0, y0 = pos[u]
+        x1, y1 = pos[v]
+
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
 
+        if is_test_graph and "length" in data:
+            edge_labels.append(
+                go.Scatter(
+                    x=[(x0 + x1) / 2],
+                    y=[(y0 + y1) / 2],
+                    text=[str(data["length"])],
+                    mode="text",
+                    textfont=dict(size=14, color="black"),
+                    hoverinfo="skip"
+                )
+            )
+
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
-        line=dict(width=1, color="#888"),
-        hoverinfo='none',
-        mode='lines'
+        mode="lines",
+        line=dict(width=1, color="#BBBBBB"),
+        hoverinfo="none"
     )
 
-    node_x = []
-    node_y = []
-
-    for node, data in nodes:
-        node_x.append(data['x'])
-        node_y.append(data['y'])
+    node_x, node_y = [], []
+    for n in G.nodes():
+        x, y = pos[n]
+        node_x.append(x)
+        node_y.append(y)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode='markers',
-        hoverinfo='text',
-        marker=dict(color='blue', size=4)
+        mode="markers+text" if is_test_graph else "markers",
+        text=[str(n) for n in G.nodes()] if is_test_graph else None,
+        textposition="top center",
+        marker=dict(
+            size=22 if is_test_graph else 8,
+            color="#1f77b4",
+            line=dict(width=2 if is_test_graph else 0.5, color="black")
+        ),
+        hoverinfo="text"
     )
 
     fig = go.Figure([edge_trace, node_trace])
+    for lbl in edge_labels:
+        fig.add_trace(lbl)
+
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600
+        plot_bgcolor="white"
     )
+
     return fig
 
 
 # ---------------------------------------------------------
-# Dijkstra étape par étape (générateur) - Version OSMnx
+# Dijkstra étape par étape — VERSION FINALE
 # ---------------------------------------------------------
-def dijkstra_steps(G, source, target=None):
-    """
-    Générateur qui yield chaque étape de l'algorithme de Dijkstra
-    Compatible avec les MultiDiGraph d'OSMnx
-    """
-    import math
-    
-    dist = {node: float('inf') for node in G.nodes()}
-    dist[source] = 0
+def dijkstra_steps(G, start, end=None):
+    dist = {start: 0}
+    parent = {start: None}
     visited = set()
-    pq = [(0, source)]
-    parent = {}
+    pq = [(0, start)]
 
     while pq:
-        d, u = heapq.heappop(pq)
+        current_dist, u = heapq.heappop(pq)
 
         if u in visited:
             continue
-
         visited.add(u)
 
         yield {
             "current": u,
-            "dist": dist.copy(),
-            "visited": visited.copy(),
-            "parent": parent.copy()
+            "dist": dict(dist),
+            "parent": dict(parent),
+            "visited": set(visited)
         }
 
-        # Arrêt si on a atteint la cible
-        if target is not None and u == target:
-            break
-
-        # Parcours des voisins (successors pour DiGraph)
-        for v in G.successors(u):
-            # Gestion des MultiDiGraph : plusieurs arêtes possibles
-            edges = G.get_edge_data(u, v)
+        # Pour OSMnx (MultiDiGraph), on utilise G[u] pour les voisins sortants
+        if u not in G: continue
+        
+        for v in G[u]:
+            if v in visited: continue
             
-            # Trouver le poids minimal parmi toutes les arêtes u->v
-            min_weight = min(
-                edge_data.get('length', 1)
-                for edge_data in edges.values()
-            )
-            
-            if dist[u] + min_weight < dist[v]:
-                dist[v] = dist[u] + min_weight
-                parent[v] = u
-                heapq.heappush(pq, (dist[v], v))
+            edge_data = G.get_edge_data(u, v)
+            if edge_data:
+                # On prend la plus courte arête entre u et v
+                if isinstance(edge_data, dict):
+                    weight = min(d.get('length', 1) for d in edge_data.values())
+                else:
+                    weight = edge_data.get('length', 1)
+                
+                new_dist = current_dist + weight
+                if new_dist < dist.get(v, float('inf')):
+                    dist[v] = new_dist
+                    parent[v] = u
+                    heapq.heappush(pq, (new_dist, v))
 
-    # Étape finale
-    yield {
-        "current": None,
-        "dist": dist,
-        "visited": visited,
-        "parent": parent
-    }
+    yield {"current": None, "dist": dict(dist), "parent": dict(parent), "visited": set(visited)}
 
 
 # ---------------------------------------------------------
-# Affichage du graphe avec seulement start/end visibles
+# Graphe avec start / end
 # ---------------------------------------------------------
-def plot_graph_with_points(G, start=None, end=None):
-    """
-    Affiche le graphe complet en arrière-plan avec les points de départ et d'arrivée
-    """
-    # Arêtes (tout le graphe)
-    edge_x = []
-    edge_y = []
+def plot_graph_with_points(G, start_node, end_node, is_test_graph=False):
 
-    for u, v in G.edges():
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
+    if all('x' in G.nodes[n] and 'y' in G.nodes[n] for n in G.nodes()):
+        pos = {n: (G.nodes[n]['x'], G.nodes[n]['y']) for n in G.nodes()}
+    else:
+        pos = nx.spring_layout(G, seed=42)
+
+    edge_x, edge_y, edge_labels = [], [], []
+
+    for u, v, data in G.edges(data=True):
+        x0, y0 = pos[u]
+        x1, y1 = pos[v]
+
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
 
+        if is_test_graph and "length" in data:
+            edge_labels.append(
+                go.Scatter(
+                    x=[(x0 + x1) / 2],
+                    y=[(y0 + y1) / 2],
+                    text=[str(data["length"])],
+                    mode="text",
+                    textfont=dict(size=14, color="black"),
+                    hoverinfo="skip"
+                )
+            )
+
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
-        mode='lines',
-        line=dict(width=0.5, color="#ddd"),
-        hoverinfo='none'
+        mode="lines",
+        line=dict(width=1, color="#BBBBBB"),
+        hoverinfo="none"
     )
 
-    # Tous les nœuds (en gris très clair)
-    all_node_x = []
-    all_node_y = []
-    
-    for node, data in G.nodes(data=True):
-        all_node_x.append(data['x'])
-        all_node_y.append(data['y'])
-    
-    all_nodes_trace = go.Scatter(
-        x=all_node_x,
-        y=all_node_y,
-        mode='markers',
-        marker=dict(size=2, color="#eee"),
-        hoverinfo='none'
-    )
+    node_x, node_y, node_color = [], [], []
 
-    # Points de départ et d'arrivée (en surbrillance)
-    point_x = []
-    point_y = []
-    point_color = []
-    point_text = []
+    for n in G.nodes():
+        x, y = pos[n]
+        node_x.append(x)
+        node_y.append(y)
 
-    if start is not None:
-        point_x.append(G.nodes[start]['x'])
-        point_y.append(G.nodes[start]['y'])
-        point_color.append("green")
-        point_text.append("Départ")
+        if n == start_node:
+            node_color.append("green")
+        elif n == end_node:
+            node_color.append("red")
+        else:
+            node_color.append("#1f77b4")
 
-    if end is not None:
-        point_x.append(G.nodes[end]['x'])
-        point_y.append(G.nodes[end]['y'])
-        point_color.append("red")
-        point_text.append("Arrivée")
-
-    point_trace = go.Scatter(
-        x=point_x,
-        y=point_y,
-        mode='markers+text',
-        marker=dict(size=14, color=point_color, line=dict(width=2, color='white')),
-        text=point_text,
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers+text" if is_test_graph else "markers",
+        text=[str(n) for n in G.nodes()] if is_test_graph else None,
         textposition="top center",
-        textfont=dict(size=12, color='black'),
-        hoverinfo='none'
+        marker=dict(
+            size=22 if is_test_graph else 10,
+            color=node_color,
+            line=dict(width=2 if is_test_graph else 0.5, color="black")
+        ),
+        hoverinfo="text"
     )
 
-    fig = go.Figure([edge_trace, all_nodes_trace, point_trace])
+    fig = go.Figure([edge_trace, node_trace])
+    for lbl in edge_labels:
+        fig.add_trace(lbl)
+
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600
+        plot_bgcolor="white"
     )
+
     return fig
 
 
 # ---------------------------------------------------------
-# Affichage d'une étape de Dijkstra (tous les nœuds)
+# Étape Dijkstra – TOUS les nœuds
 # ---------------------------------------------------------
-def plot_dijkstra_step(G, step, start=None, end=None):
-    """
-    Affiche tous les nœuds avec coloration selon leur état
-    """
+def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
+
     visited = step["visited"]
-    parent = step["parent"]
     current = step["current"]
 
-    edge_x = []
-    edge_y = []
-
+    edge_x, edge_y = [], []
     for u, v in G.edges():
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        edge_x += [x0, x1, None]
-        edge_y += [y0, y1, None]
+        edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
-        mode='lines',
+        mode="lines",
         line=dict(width=1, color="#ddd"),
-        hoverinfo='none'
+        hoverinfo="none"
     )
 
-    node_x = []
-    node_y = []
-    node_color = []
-    node_size = []
+    node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
-    for node, data in G.nodes(data=True):
-        node_x.append(data['x'])
-        node_y.append(data['y'])
+    for n in G.nodes():
+        node_x.append(G.nodes[n]['x'])
+        node_y.append(G.nodes[n]['y'])
+        labels.append(str(n))
 
-        if node == current:
+        if n == current:
             node_color.append("yellow")
-            node_size.append(10)
-        elif node == start:
+            node_size.append(45)
+        elif n == start:
             node_color.append("green")
-            node_size.append(10)
-        elif node == end:
+            node_size.append(40)
+        elif n == end:
             node_color.append("red")
-            node_size.append(10)
-        elif node in visited:
+            node_size.append(40)
+        elif n in visited:
             node_color.append("blue")
-            node_size.append(6)
+            node_size.append(38)
         else:
             node_color.append("lightgray")
-            node_size.append(4)
+            node_size.append(35)
 
     node_trace = go.Scatter(
-        x=node_x,
-        y=node_y,
-        mode='markers',
-        marker=dict(size=node_size, color=node_color),
-        hoverinfo='none'
+        x=node_x, y=node_y,
+        mode="markers+text",
+        text=labels if is_test_graph else None,
+        textposition="middle center",
+        marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
+        textfont=dict(size=9, color="white", family="Arial Black"),
+        hoverinfo="text"
     )
 
     fig = go.Figure([edge_trace, node_trace])
@@ -263,113 +266,58 @@ def plot_dijkstra_step(G, step, start=None, end=None):
 
 
 # ---------------------------------------------------------
-# Affichage dynamique (seulement nœuds visités)
+# Étape Dijkstra – dynamique
 # ---------------------------------------------------------
-def plot_dijkstra_step_dynamic(G, step, start=None, end=None):
-    """
-    Affiche le graphe complet en arrière-plan avec seulement les nœuds visités en surbrillance
-    """
+def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=False):
+
     visited = step["visited"]
-    parent = step["parent"]
     current = step["current"]
-    
-    # Ensemble des nœuds à mettre en surbrillance
-    nodes_to_highlight = visited.copy()
-    if start is not None:
-        nodes_to_highlight.add(start)
-    if end is not None:
-        nodes_to_highlight.add(end)
-    if current is not None:
-        nodes_to_highlight.add(current)
-    
-    # TOUTES les arêtes du graphe (en gris très clair)
-    all_edge_x = []
-    all_edge_y = []
-    
+
+    highlight = visited | {n for n in [start, end, current] if n is not None}
+
+    all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        all_edge_x += [x0, x1, None]
-        all_edge_y += [y0, y1, None]
-    
+        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+
     all_edge_trace = go.Scatter(
         x=all_edge_x, y=all_edge_y,
-        mode='lines',
+        mode="lines",
         line=dict(width=0.5, color="#e0e0e0"),
-        hoverinfo='none'
+        hoverinfo="none"
     )
-    
-    # TOUS les nœuds du graphe (en gris très clair)
-    all_node_x = []
-    all_node_y = []
-    
-    for node, data in G.nodes(data=True):
-        all_node_x.append(data['x'])
-        all_node_y.append(data['y'])
-    
-    all_nodes_trace = go.Scatter(
-        x=all_node_x,
-        y=all_node_y,
-        mode='markers',
-        marker=dict(size=2, color="#f0f0f0"),
-        hoverinfo='none'
-    )
-    
-    # Arêtes visitées (celles qui connectent des nœuds visités) - en couleur
-    visited_edge_x = []
-    visited_edge_y = []
-    
-    for u, v in G.edges():
-        if u in nodes_to_highlight and v in nodes_to_highlight:
-            x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-            x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-            visited_edge_x += [x0, x1, None]
-            visited_edge_y += [y0, y1, None]
-    
-    visited_edge_trace = go.Scatter(
-        x=visited_edge_x, y=visited_edge_y,
-        mode='lines',
-        line=dict(width=2, color="#aaa"),
-        hoverinfo='none'
-    )
-    
-    # Nœuds visités (en surbrillance)
-    node_x = []
-    node_y = []
-    node_color = []
-    node_size = []
-    
-    for node in nodes_to_highlight:
-        data = G.nodes[node]
-        node_x.append(data['x'])
-        node_y.append(data['y'])
-        
-        # Coloration selon le rôle du nœud
-        if node == current:
+
+    node_x, node_y, node_color, node_size, labels = [], [], [], [], []
+
+    for n in highlight:
+        node_x.append(G.nodes[n]['x'])
+        node_y.append(G.nodes[n]['y'])
+        labels.append(str(n))
+
+        if n == current:
             node_color.append("yellow")
-            node_size.append(14)
-        elif node == start:
+            node_size.append(45)
+        elif n == start:
             node_color.append("green")
-            node_size.append(14)
-        elif node == end:
+            node_size.append(40)
+        elif n == end:
             node_color.append("red")
-            node_size.append(14)
-        elif node in visited:
-            node_color.append("blue")
-            node_size.append(8)
+            node_size.append(40)
         else:
-            node_color.append("gray")
-            node_size.append(6)
-    
+            node_color.append("blue")
+            node_size.append(38)
+
     node_trace = go.Scatter(
-        x=node_x,
-        y=node_y,
-        mode='markers',
-        marker=dict(size=node_size, color=node_color, line=dict(width=1, color='white')),
-        hoverinfo='none'
+        x=node_x, y=node_y,
+        mode="markers+text",
+        text=labels if is_test_graph else None,
+        textposition="middle center",
+        marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
+        textfont=dict(size=9, color="white", family="Arial Black"),
+        hoverinfo="text"
     )
-    
-    fig = go.Figure([all_edge_trace, all_nodes_trace, visited_edge_trace, node_trace])
+
+    fig = go.Figure([all_edge_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -381,112 +329,91 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None):
 
 
 # ---------------------------------------------------------
-# Affichage du chemin final
+# Chemin final
 # ---------------------------------------------------------
-def plot_final_path(G, step, start, end):
-    """
-    Affiche le graphe complet avec le chemin final trouvé par Dijkstra
-    """
-    visited = step["visited"]
+def plot_final_path(G, step, start, end, is_test_graph=False):
+
     parent = step["parent"]
-    
-    # Reconstruire le chemin
+    visited = step["visited"]
+
+    # Reconstruction du chemin
     path = []
-    current_node = end
-    while current_node is not None:
-        path.append(current_node)
-        current_node = parent.get(current_node)
+    current = end
+
+    while current is not None:
+        if current not in G.nodes:
+            break
+        path.append(current)
+        current = parent.get(current)
+
     path.reverse()
-    
-    # Vérifier que le chemin est valide
-    if len(path) == 0 or path[0] != start:
-        # Pas de chemin trouvé, afficher juste les nœuds visités
-        return plot_dijkstra_step_dynamic(G, step, start, end)
-    
-    # TOUTES les arêtes du graphe (en gris très clair)
-    all_edge_x = []
-    all_edge_y = []
-    
+
+    if not path or path[0] != start:
+        return plot_dijkstra_step_dynamic(G, step, start, end, is_test_graph)
+
+    all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        all_edge_x += [x0, x1, None]
-        all_edge_y += [y0, y1, None]
-    
+        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+
     all_edge_trace = go.Scatter(
         x=all_edge_x, y=all_edge_y,
-        mode='lines',
+        mode="lines",
         line=dict(width=0.5, color="#e0e0e0"),
-        hoverinfo='none'
+        hoverinfo="none"
     )
-    
-    # TOUS les nœuds du graphe (en gris très clair)
-    all_node_x = []
-    all_node_y = []
-    
-    for node, data in G.nodes(data=True):
-        all_node_x.append(data['x'])
-        all_node_y.append(data['y'])
-    
-    all_nodes_trace = go.Scatter(
-        x=all_node_x,
-        y=all_node_y,
-        mode='markers',
-        marker=dict(size=2, color="#f0f0f0"),
-        hoverinfo='none'
-    )
-    
-    # Arêtes du chemin (en vert épais)
-    path_edge_x = []
-    path_edge_y = []
-    
+
+    path_edge_x, path_edge_y = [], []
     for i in range(len(path) - 1):
         u, v = path[i], path[i + 1]
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        path_edge_x += [x0, x1, None]
-        path_edge_y += [y0, y1, None]
-    
-    path_edge_trace = go.Scatter(
+        path_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        path_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+
+    path_trace = go.Scatter(
         x=path_edge_x, y=path_edge_y,
-        mode='lines',
+        mode="lines",
         line=dict(width=6, color="green"),
-        hoverinfo='none'
+        hoverinfo="none"
     )
-    
-    # Nœuds visités (en surbrillance)
-    visited_node_x = []
-    visited_node_y = []
-    visited_node_color = []
-    visited_node_size = []
-    
-    for node in visited:
-        data = G.nodes[node]
-        visited_node_x.append(data['x'])
-        visited_node_y.append(data['y'])
-        
-        if node == start:
-            visited_node_color.append("green")
-            visited_node_size.append(16)
-        elif node == end:
-            visited_node_color.append("red")
-            visited_node_size.append(16)
-        elif node in path:
-            visited_node_color.append("lightgreen")
-            visited_node_size.append(10)
+
+    node_x, node_y, node_color, node_size, labels = [], [], [], [], []
+
+    for n in visited:
+        if n not in G.nodes:
+            continue
+
+        node_x.append(G.nodes[n]['x'])
+        node_y.append(G.nodes[n]['y'])
+        labels.append(str(n))
+
+        if n == start:
+            node_color.append("green")
+            node_size.append(45)
+        elif n == end:
+            node_color.append("red")
+            node_size.append(45)
+        elif n in path:
+            node_color.append("lightgreen")
+            node_size.append(40)
         else:
-            visited_node_color.append("lightblue")
-            visited_node_size.append(6)
-    
-    visited_node_trace = go.Scatter(
-        x=visited_node_x,
-        y=visited_node_y,
-        mode='markers',
-        marker=dict(size=visited_node_size, color=visited_node_color, line=dict(width=1, color='white')),
-        hoverinfo='none'
+            node_color.append("lightblue")
+            node_size.append(35)
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers+text",
+        text=labels if is_test_graph else None,
+        textposition="middle center",
+        marker=dict(
+            size=node_size,
+            color=node_color,
+            line=dict(width=2, color="white")
+        ),
+        textfont=dict(size=9, color="white", family="Arial Black"),
+        hoverinfo="text"
     )
-    
-    fig = go.Figure([all_edge_trace, all_nodes_trace, path_edge_trace, visited_node_trace])
+
+    fig = go.Figure([all_edge_trace, path_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -494,4 +421,5 @@ def plot_final_path(G, step, start, end):
         yaxis=dict(visible=False),
         height=600
     )
+
     return fig
