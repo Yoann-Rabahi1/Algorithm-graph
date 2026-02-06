@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from dfs_functions import *
+from dfs_functions import plot_dfs_step, dfs_steps
 from download_graph import create_french_cities_graph
 
 st.set_page_config(page_title="DFS - Parcours en Profondeur", layout="wide")
@@ -14,32 +14,27 @@ Cette page te permet de :
 - charger le graphe des métropoles,
 - choisir un nœud de départ,
 - observer l’exploration étape par étape,
-- visualiser le chemin parcouru,
 - suivre la progression et le temps d’exécution.
 """)
 
 # -----------------------------------------------------------
 # SESSION STATE
 # -----------------------------------------------------------
-if "graph" not in st.session_state:
-    st.session_state.graph = None
-if "node_list" not in st.session_state:
-    st.session_state.node_list = []
-if "steps" not in st.session_state:
-    st.session_state.steps = []
-if "step_index" not in st.session_state:
-    st.session_state.step_index = 0
-if "running" not in st.session_state:
-    st.session_state.running = False
-if "paused" not in st.session_state:
-    st.session_state.paused = False
-if "finished" not in st.session_state:
-    st.session_state.finished = False
-if "start_node" not in st.session_state:
-    st.session_state.start_node = None
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
+defaults = {
+    "graph": None,
+    "node_list": [],
+    "steps": [],
+    "step_index": 0,
+    "running": False,
+    "paused": False,
+    "finished": False,
+    "start_node": None,
+    "start_time": None
+}
 
+for key, val in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
 # -----------------------------------------------------------
 # SIDEBAR
@@ -150,7 +145,7 @@ graph_placeholder = st.empty()
 
 if st.session_state.graph is not None:
 
-    # MODE ANIMATION
+    # --- MODE ANIMATION ---
     if st.session_state.running and not st.session_state.paused:
 
         if st.session_state.step_index < len(st.session_state.steps):
@@ -174,10 +169,10 @@ if st.session_state.graph is not None:
             st.session_state.finished = True
             st.rerun()
 
-    # MODE PAUSE / FIN
-    elif st.session_state.paused or st.session_state.finished:
+    # --- MODE PAUSE ---
+    elif st.session_state.paused and not st.session_state.finished:
 
-        step = st.session_state.steps[min(st.session_state.step_index, len(st.session_state.steps)-1)]
+        step = st.session_state.steps[st.session_state.step_index]
 
         fig = plot_dfs_step(
             st.session_state.graph,
@@ -188,18 +183,29 @@ if st.session_state.graph is not None:
 
         graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-        # Retracer le chemin parcouru jusqu’au dernier nœud
-        if step["current"] is not None:
-            path = []
-            node = step["current"]
-            while node is not None:
-                path.append(node)
-                node = step["parent"].get(node)
-            path.reverse()
+    # --- MODE FIN ---
+    elif st.session_state.finished:
 
-            st.info(f"🧭 Chemin parcouru : {path}")
+        final_step = st.session_state.steps[-1]
 
-    # MODE INITIAL
+        fig = plot_dfs_step(
+            st.session_state.graph,
+            final_step,
+            st.session_state.start_node,
+            is_test_graph=True
+        )
+
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+
+        # Liste complète des visités dans l'ordre
+        st.success(f"📌 Ordre de visite ({len(final_step['visit_order'])}) : {final_step['visit_order']}")
+
+        # Temps total
+        if st.session_state.start_time:
+            elapsed = time.time() - st.session_state.start_time
+            st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
+
+    # --- MODE INITIAL ---
     else:
         st.info("Sélectionne un nœud puis clique sur ▶️ Démarrer.")
 

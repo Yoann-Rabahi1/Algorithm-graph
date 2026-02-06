@@ -160,6 +160,12 @@ def plot_kruskal_step(G, step):
     mst_edges = step["mst_edges"]
     visited = step["visited_edges"]
 
+    # Déterminer les nœuds visités (comme dans Prim)
+    visited_nodes = set()
+    for u, v, w in mst_edges:
+        visited_nodes.add(u)
+        visited_nodes.add(v)
+
     # Arrière-plan
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
@@ -228,12 +234,17 @@ def plot_kruskal_step(G, step):
     else:
         cur_trace = go.Scatter(x=[], y=[])
 
-    # Nœuds + labels
-    node_x, node_y, labels = [], [], []
+    # Nœuds + labels (style Dijkstra + visited en bleu)
+    node_x, node_y, labels, colors = [], [], [], []
     for n, data in G.nodes(data=True):
         node_x.append(data["x"])
         node_y.append(data["y"])
         labels.append(str(n))
+
+        if n in visited_nodes:
+            colors.append("#1E90FF")  # bleu vif
+        else:
+            colors.append("black")    # noir
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -241,11 +252,11 @@ def plot_kruskal_step(G, step):
         text=labels,
         textposition="top center",
         marker=dict(
-            size=22,
-            color="black",
-            line=dict(width=2, color="white")
+            size=28,
+            color=colors,
+            line=dict(width=3, color="white")
         ),
-        textfont=dict(size=12, color="white", family="Arial Black"),
+        textfont=dict(size=14, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 

@@ -165,7 +165,7 @@ if st.session_state.graph is not None:
 
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-            st.info(f"Arêtes MST: {len(step['mst_edges'])}, coût: {step['total_cost']:.2f}")
+            st.success(f"Arêtes MST: {len(step['mst_edges'])}, coût: {step['total_cost']:.2f}")
 
             if st.session_state.finished and st.session_state.start_time:
                 elapsed = time.time() - st.session_state.start_time

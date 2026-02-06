@@ -166,23 +166,37 @@ def plot_prim_step(G, step):
     else:
         cur_trace = go.Scatter(x=[], y=[])
 
-    # noeuds, ceux dans l'arbre en bleu
+        # noeuds, style Dijkstra amélioré
     node_x, node_y, labels, colors = [], [], [], []
     for n, data in G.nodes(data=True):
         node_x.append(data["x"])
         node_y.append(data["y"])
         labels.append(str(n))
-        colors.append("blue" if n in visited_nodes else "black")
+
+        # bleu pour les noeuds déjà dans l'arbre
+        if n in visited_nodes:
+            colors.append("#1E90FF")  # bleu vif
+        else:
+            colors.append("#000000")  # noir
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode="markers+text",
         text=labels,
         textposition="top center",
-        marker=dict(size=22, color=colors, line=dict(width=2, color="white")),
-        textfont=dict(size=12, color="white", family="Arial Black"),
+        marker=dict(
+            size=28,                     # plus gros
+            color=colors,
+            line=dict(width=3, color="white")  # bord blanc épais
+        ),
+        textfont=dict(
+            size=14,
+            color="white",
+            family="Arial Black"
+        ),
         hoverinfo="text"
     )
+
 
     fig = go.Figure([bg_edges, mst_trace, cand_trace, cur_trace, node_trace])
     fig.update_layout(
@@ -200,8 +214,26 @@ def plot_prim_step(G, step):
 # ---------------------------------------------------------
 # Affichage MST final (Prim)
 # ---------------------------------------------------------
-def plot_prim_mst(G, mst_edges):
-    # réutilise le style Kruskal
+def plot_dfs_final_path(G, step, start, end, is_test_graph=False):
+
+    parent = step["parent"]
+    visited = step["visited"]
+
+    # Reconstruction du chemin final
+    path = []
+    node = end
+    while node is not None:
+        if node not in G.nodes:
+            break
+        path.append(node)
+        node = parent.get(node)
+    path.reverse()
+
+    # Si pas de chemin → fallback
+    if not path or path[0] != start:
+        return plot_dfs_step(G, step, start, end, is_test_graph)
+
+    # Arrière-plan
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
@@ -210,39 +242,68 @@ def plot_prim_mst(G, mst_edges):
     bg_edges = go.Scatter(
         x=all_edge_x, y=all_edge_y,
         mode="lines",
-        line=dict(width=1.5, color="#A0A0A0"),
+        line=dict(width=0.5, color="#444"),
         hoverinfo="none"
     )
 
-    mst_x, mst_y = [], []
-    for u, v, w in mst_edges:
-        mst_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        mst_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+    # Arêtes du chemin final
+    path_edge_x, path_edge_y = [], []
+    for i in range(len(path) - 1):
+        u, v = path[i], path[i + 1]
+        path_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        path_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
 
-    mst_trace = go.Scatter(
-        x=mst_x, y=mst_y,
+    path_trace = go.Scatter(
+        x=path_edge_x, y=path_edge_y,
         mode="lines",
-        line=dict(width=6, color="green"),
+        line=dict(width=6, color="orange"),
         hoverinfo="none"
     )
 
-    node_x, node_y, labels = [], [], []
-    for n, data in G.nodes(data=True):
-        node_x.append(data["x"])
-        node_y.append(data["y"])
+    # --- NOEUDS (style harmonisé) ---
+    node_x, node_y, node_color, node_size, labels = [], [], [], [], []
+
+    for n in G.nodes():
+
+        node_x.append(G.nodes[n]['x'])
+        node_y.append(G.nodes[n]['y'])
         labels.append(str(n))
+
+        if n == start:
+            node_color.append("green")
+            node_size.append(55)
+
+        elif n == end:
+            node_color.append("red")
+            node_size.append(55)
+
+        elif n in path:
+            node_color.append("orange")
+            node_size.append(50)
+
+        elif n in visited:
+            node_color.append("#1E3A8A")  # bleu foncé
+            node_size.append(45)
+
+        else:
+            node_color.append("black")
+            node_size.append(40)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode="markers+text",
-        text=labels,
-        textposition="top center",
-        marker=dict(size=22, color="black", line=dict(width=2, color="white")),
+        text=labels if is_test_graph else None,
+        textposition="middle center",
+        marker=dict(
+            size=node_size,
+            color=node_color,
+            line=dict(width=4, color="white")
+        ),
         textfont=dict(size=12, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 
-    fig = go.Figure([bg_edges, mst_trace, node_trace])
+    fig = go.Figure([bg_edges, path_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -252,4 +313,5 @@ def plot_prim_mst(G, mst_edges):
         plot_bgcolor="lightblue",
         paper_bgcolor="lightblue"
     )
+
     return fig
