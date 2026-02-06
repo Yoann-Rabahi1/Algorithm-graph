@@ -1,27 +1,19 @@
 import streamlit as st
 import time
 
-from download_graph import *
-from kruskal_functions import *
-from plotly_graph import *
+from pert_functions import build_pert_graph, pert_compute_steps, plot_pert_step
 
-st.set_page_config(page_title="Kruskal - MST", layout="wide")
+st.set_page_config(page_title="PERT", layout="wide")
 
-# -----------------------------------------------------------
-# TITRE + INTRO
-# -----------------------------------------------------------
-st.title("🌳 Algorithme de Kruskal — Arbre couvrant minimal (MST)")
+st.title("📌 PERT, chemin critique")
 
 st.markdown("""
-Cette page te permet de visualiser **Kruskal étape par étape**, exactement comme DFS :
+Cette page affiche PERT étape par étape:
 
-- tri des arêtes par poids  
-- union-find  
-- construction progressive du MST  
-- visualisation dynamique  
-- coût total final  
-
-Le graphe utilisé est **uniquement celui des métropoles françaises**.
+- forward pass (ES, EF)
+- backward pass (LS, LF)
+- marges (slack)
+- chemin critique
 """)
 
 # -----------------------------------------------------------
@@ -34,7 +26,8 @@ for key, default in {
     "running": False,
     "paused": False,
     "finished": False,
-    "start_time": None
+    "start_time": None,
+    "project_duration": None
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -45,9 +38,18 @@ for key, default in {
 with st.sidebar:
     st.header("⚙️ Configuration")
 
-    if st.button("📥 Charger le graphe des métropoles", type="primary"):
-        st.session_state.graph = create_french_cities_graph()
-        st.success("Graphe chargé !")
+    st.subheader("📥 Charger un exemple PERT")
+    if st.button("Charger exemple", type="primary"):
+        tasks = [
+            {"id": "A", "duration": 4, "pred": []},
+            {"id": "B", "duration": 3, "pred": ["A"]},
+            {"id": "C", "duration": 2, "pred": ["A"]},
+            {"id": "D", "duration": 5, "pred": ["B"]},
+            {"id": "E", "duration": 1, "pred": ["B", "C"]},
+            {"id": "F", "duration": 2, "pred": ["D", "E"]},
+        ]
+        st.session_state.graph = build_pert_graph(tasks)
+        st.success("PERT chargé")
         st.rerun()
 
     st.subheader("⚡ Vitesse")
@@ -63,7 +65,7 @@ col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     if st.button("▶️ Démarrer", disabled=st.session_state.running):
         if st.session_state.graph is None:
-            st.error("Charge d'abord le graphe des métropoles.")
+            st.error("Charge un exemple PERT d'abord.")
         else:
             st.session_state.running = True
             st.session_state.paused = False
@@ -71,9 +73,14 @@ with col1:
             st.session_state.step_index = 0
             st.session_state.start_time = time.time()
 
-            st.session_state.steps = list(
-                kruskal_steps(st.session_state.graph, weight="length")
-            )
+            try:
+                st.session_state.steps = list(pert_compute_steps(st.session_state.graph))
+            except Exception as e:
+                st.session_state.running = False
+                st.session_state.steps = []
+                st.error(f"Erreur PERT: {e}")
+                st.stop()
+
             st.rerun()
 
 with col2:
@@ -98,17 +105,18 @@ with col5:
         st.session_state.finished = False
         st.session_state.step_index = 0
         st.session_state.steps = []
+        st.session_state.project_duration = None
         st.rerun()
 
 # -----------------------------------------------------------
-# STATUS (progression + temps)
+# STATUS
 # -----------------------------------------------------------
 if st.session_state.steps:
     colA, colB, colC = st.columns(3)
 
     with colA:
         if st.session_state.finished:
-            st.success("MST terminé")
+            st.success("PERT terminé")
         elif st.session_state.paused:
             st.warning("En pause")
         elif st.session_state.running:
@@ -127,12 +135,7 @@ if st.session_state.steps:
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
-# -----------------------------------------------------------
-# VISUALISATION
-# -----------------------------------------------------------
 st.header("📊 Visualisation")
-graph_placeholder = st.empty()
-
 graph_placeholder = st.empty()
 
 if st.session_state.graph is not None:
@@ -142,8 +145,7 @@ if st.session_state.graph is not None:
 
         if st.session_state.step_index < len(st.session_state.steps):
             step = st.session_state.steps[st.session_state.step_index]
-
-            fig = plot_kruskal_step(st.session_state.graph, step)
+            fig = plot_pert_step(st.session_state.graph, step)
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
             time.sleep(speed)
@@ -157,56 +159,33 @@ if st.session_state.graph is not None:
 
     # MODE PAUSE / FIN
     else:
-
-        # ⚠️ IMPORTANT : vérifier que steps n'est pas vide
         if st.session_state.steps:
-
-            # On récupère la dernière étape valide
             step = st.session_state.steps[min(
                 st.session_state.step_index,
                 len(st.session_state.steps) - 1
             )]
 
-            # --- AFFICHAGE DU GRAPHE ---
-            if st.session_state.finished:
-                fig = plot_kruskal_mst(st.session_state.graph, step["mst_edges"])
-            else:
-                fig = plot_kruskal_step(st.session_state.graph, step)
-
+            fig = plot_pert_step(st.session_state.graph, step)
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-            # --- AFFICHAGE DES RÉSULTATS FINAUX ---
-            if st.session_state.finished:
+            phase = step.get("phase", "")
+            st.info(f"Phase: {phase}")
 
-                # Coût total de l’ACPM
-                total_cost = sum(w for (_, _, w) in step["mst_edges"])
-                st.success(f"🌳 Coût total de l’ACPM : **{total_cost:.2f}**")
+            if phase == "final":
+                pdur = step.get("project_duration", None)
+                if pdur is not None:
+                    st.success(f"Durée totale projet: {pdur:.0f}")
 
-                # Temps total
-                if st.session_state.start_time:
-                    elapsed = time.time() - st.session_state.start_time
-                    st.info(f"⏱️ Temps total d'exécution : **{elapsed:.2f} sec**")
+                crit = sorted(list(step.get("critical_nodes", set())))
+                st.write(f"Nœuds critiques: {crit}")
 
         else:
-            st.info("Clique sur ▶️ Démarrer pour lancer Kruskal.")
-
+            st.info("Clique sur ▶️ Démarrer.")
 else:
-    st.warning("Aucun graphe chargé.")
+    st.warning("Aucun PERT chargé.")
 
-
-# -----------------------------------------------------------
-# FOOTER
-# -----------------------------------------------------------
 st.divider()
 st.markdown("""
-### ℹ️ À propos de Kruskal
-
-L’algorithme de Kruskal construit un **arbre couvrant minimal (MST)** en :
-
-1. triant les arêtes par poids,  
-2. ajoutant les arêtes les plus légères,  
-3. évitant les cycles grâce à **union-find**,  
-4. jusqu’à connecter tout le graphe.
-
-Cette page te permet de suivre **chaque étape** de sa construction.
+### ℹ️ PERT
+PERT calcule les dates au plus tôt, au plus tard, la marge, puis déduit le chemin critique (marge = 0).
 """)

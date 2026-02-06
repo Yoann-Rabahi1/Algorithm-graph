@@ -1,27 +1,17 @@
 import streamlit as st
 import time
+import math
 
 from download_graph import *
-from kruskal_functions import *
-from plotly_graph import *
+from bellman_ford_functions import *
 
-st.set_page_config(page_title="Kruskal - MST", layout="wide")
+st.set_page_config(page_title="Bellman Ford", layout="wide")
 
-# -----------------------------------------------------------
-# TITRE + INTRO
-# -----------------------------------------------------------
-st.title("🌳 Algorithme de Kruskal — Arbre couvrant minimal (MST)")
+st.title("🧭 Bellman Ford, plus courts chemins")
 
 st.markdown("""
-Cette page te permet de visualiser **Kruskal étape par étape**, exactement comme DFS :
-
-- tri des arêtes par poids  
-- union-find  
-- construction progressive du MST  
-- visualisation dynamique  
-- coût total final  
-
-Le graphe utilisé est **uniquement celui des métropoles françaises**.
+Bellman Ford calcule les plus courts chemins depuis une source.
+Il supporte les poids négatifs et peut détecter un cycle négatif.
 """)
 
 # -----------------------------------------------------------
@@ -29,11 +19,14 @@ Le graphe utilisé est **uniquement celui des métropoles françaises**.
 # -----------------------------------------------------------
 for key, default in {
     "graph": None,
+    "node_list": [],
     "steps": [],
     "step_index": 0,
     "running": False,
     "paused": False,
     "finished": False,
+    "start_node": None,
+    "end_node": None,
     "start_time": None
 }.items():
     if key not in st.session_state:
@@ -47,11 +40,34 @@ with st.sidebar:
 
     if st.button("📥 Charger le graphe des métropoles", type="primary"):
         st.session_state.graph = create_french_cities_graph()
+        st.session_state.node_list = list(st.session_state.graph.nodes())
         st.success("Graphe chargé !")
         st.rerun()
 
-    st.subheader("⚡ Vitesse")
-    speed = st.slider("Délai entre étapes (sec)", 0.01, 1.0, 0.2, 0.01)
+    if st.session_state.graph is not None:
+        st.subheader("🎯 Source et cible")
+
+        start_idx = st.selectbox(
+            "Source",
+            range(len(st.session_state.node_list)),
+            format_func=lambda i: str(st.session_state.node_list[i]),
+            index=0
+        )
+        end_idx = st.selectbox(
+            "Cible (optionnel)",
+            range(len(st.session_state.node_list)),
+            format_func=lambda i: str(st.session_state.node_list[i]),
+            index=min(1, len(st.session_state.node_list) - 1)
+        )
+
+        st.session_state.start_node = st.session_state.node_list[start_idx]
+        st.session_state.end_node = st.session_state.node_list[end_idx]
+
+        st.subheader("⚡ Vitesse")
+        speed = st.slider("Délai entre étapes (sec)", 0.01, 1.0, 0.2, 0.01)
+
+        st.subheader("👁️ Options")
+        show_all = st.checkbox("Afficher tous les noeuds", value=False)
 
 # -----------------------------------------------------------
 # CONTROLS
@@ -63,7 +79,7 @@ col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     if st.button("▶️ Démarrer", disabled=st.session_state.running):
         if st.session_state.graph is None:
-            st.error("Charge d'abord le graphe des métropoles.")
+            st.error("Charge d'abord un graphe.")
         else:
             st.session_state.running = True
             st.session_state.paused = False
@@ -72,7 +88,11 @@ with col1:
             st.session_state.start_time = time.time()
 
             st.session_state.steps = list(
-                kruskal_steps(st.session_state.graph, weight="length")
+                bellman_ford_steps(
+                    st.session_state.graph,
+                    st.session_state.start_node,
+                    weight="length"
+                )
             )
             st.rerun()
 
@@ -101,14 +121,14 @@ with col5:
         st.rerun()
 
 # -----------------------------------------------------------
-# STATUS (progression + temps)
+# STATUS
 # -----------------------------------------------------------
 if st.session_state.steps:
     colA, colB, colC = st.columns(3)
 
     with colA:
         if st.session_state.finished:
-            st.success("MST terminé")
+            st.success("Terminé")
         elif st.session_state.paused:
             st.warning("En pause")
         elif st.session_state.running:
@@ -117,7 +137,7 @@ if st.session_state.steps:
     with colB:
         progress = st.session_state.step_index / len(st.session_state.steps)
         st.metric("Progression", f"{st.session_state.step_index}/{len(st.session_state.steps)}")
-        st.progress(progress)
+        st.progress(min(1.0, progress))
 
     with colC:
         if st.session_state.start_time:
@@ -127,23 +147,23 @@ if st.session_state.steps:
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
-# -----------------------------------------------------------
-# VISUALISATION
-# -----------------------------------------------------------
 st.header("📊 Visualisation")
-graph_placeholder = st.empty()
-
 graph_placeholder = st.empty()
 
 if st.session_state.graph is not None:
 
-    # MODE ANIMATION
     if st.session_state.running and not st.session_state.paused:
 
         if st.session_state.step_index < len(st.session_state.steps):
             step = st.session_state.steps[st.session_state.step_index]
 
-            fig = plot_kruskal_step(st.session_state.graph, step)
+            fig = plot_bellman_ford_step(
+                st.session_state.graph,
+                step,
+                source=st.session_state.start_node,
+                target=st.session_state.end_node,
+                show_all_nodes=show_all if "show_all" in locals() else False
+            )
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
             time.sleep(speed)
@@ -155,58 +175,47 @@ if st.session_state.graph is not None:
             st.session_state.finished = True
             st.rerun()
 
-    # MODE PAUSE / FIN
     else:
-
-        # ⚠️ IMPORTANT : vérifier que steps n'est pas vide
         if st.session_state.steps:
-
-            # On récupère la dernière étape valide
             step = st.session_state.steps[min(
                 st.session_state.step_index,
                 len(st.session_state.steps) - 1
             )]
 
-            # --- AFFICHAGE DU GRAPHE ---
-            if st.session_state.finished:
-                fig = plot_kruskal_mst(st.session_state.graph, step["mst_edges"])
-            else:
-                fig = plot_kruskal_step(st.session_state.graph, step)
-
+            fig = plot_bellman_ford_step(
+                st.session_state.graph,
+                step,
+                source=st.session_state.start_node,
+                target=st.session_state.end_node,
+                show_all_nodes=show_all if "show_all" in locals() else False
+            )
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-            # --- AFFICHAGE DES RÉSULTATS FINAUX ---
-            if st.session_state.finished:
+            # affichage résultat
+            shows = step.get("phase")
+            if shows:
+                st.info(f"Phase: {shows}, itération: {step.get('iter')}")
 
-                # Coût total de l’ACPM
-                total_cost = sum(w for (_, _, w) in step["mst_edges"])
-                st.success(f"🌳 Coût total de l’ACPM : **{total_cost:.2f}**")
 
-                # Temps total
-                if st.session_state.start_time:
-                    elapsed = time.time() - st.session_state.start_time
-                    st.info(f"⏱️ Temps total d'exécution : **{elapsed:.2f} sec**")
+            if step.get("neg_cycle"):
+                st.error("Cycle négatif détecté, les distances ne sont pas fiables.")
+            elif step.get("phase") == "final":
+                dist = step.get("dist", {})
+                tgt = st.session_state.end_node
+                if tgt in dist:
+                    d = dist[tgt]
+                    if d == math.inf:
+                        st.warning("Pas de chemin vers la cible.")
+                    else:
+                        st.success(f"Distance source → cible: {d:.2f}")
 
         else:
-            st.info("Clique sur ▶️ Démarrer pour lancer Kruskal.")
-
+            st.info("Clique sur ▶️ Démarrer.")
 else:
     st.warning("Aucun graphe chargé.")
 
-
-# -----------------------------------------------------------
-# FOOTER
-# -----------------------------------------------------------
 st.divider()
 st.markdown("""
-### ℹ️ À propos de Kruskal
-
-L’algorithme de Kruskal construit un **arbre couvrant minimal (MST)** en :
-
-1. triant les arêtes par poids,  
-2. ajoutant les arêtes les plus légères,  
-3. évitant les cycles grâce à **union-find**,  
-4. jusqu’à connecter tout le graphe.
-
-Cette page te permet de suivre **chaque étape** de sa construction.
+### ℹ️ Bellman Ford
+On relâche toutes les arêtes |V|-1 fois, puis on refait un tour pour détecter un cycle négatif.
 """)
