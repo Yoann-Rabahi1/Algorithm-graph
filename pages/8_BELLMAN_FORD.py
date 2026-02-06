@@ -2,8 +2,8 @@ import streamlit as st
 import time
 import math
 
-from download_graph import create_french_cities_graph
-from bellman_ford_functions import bellman_ford_steps, plot_bellman_ford_step
+from download_graph import *
+from bellman_ford_functions import *
 
 st.set_page_config(page_title="Bellman Ford", layout="wide")
 
