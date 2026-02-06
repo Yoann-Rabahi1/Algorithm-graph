@@ -192,8 +192,10 @@ if st.session_state.graph is not None:
             graph_placeholder.plotly_chart(fig, use_container_width=True)
 
             # affichage résultat
-            if step.get("phase") shows := step.get("phase"):
+            shows = step.get("phase")
+            if shows:
                 st.info(f"Phase: {shows}, itération: {step.get('iter')}")
+
 
             if step.get("neg_cycle"):
                 st.error("Cycle négatif détecté, les distances ne sont pas fiables.")
