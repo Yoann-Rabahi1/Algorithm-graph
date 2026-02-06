@@ -2,7 +2,7 @@ import streamlit as st
 import time
 
 from download_graph import create_french_cities_graph
-from prim_functions import prim_steps, plot_prim_step, plot_prim_mst
+from prim_functions import *
 
 st.set_page_config(page_title="Prim - MST", layout="wide")
 
@@ -159,7 +159,7 @@ if st.session_state.graph is not None:
             )]
 
             if st.session_state.finished:
-                fig = plot_prim_mst(st.session_state.graph, step["mst_edges"])
+                fig = plot_prim_step(st.session_state.graph, step)
             else:
                 fig = plot_prim_step(st.session_state.graph, step)
 
