@@ -2,6 +2,7 @@ import streamlit as st
 import time
 from bfs_functions import bfs_steps, plot_bfs_step
 from download_graph import create_french_cities_graph
+from plotly_graph import *
 
 st.set_page_config(page_title="BFS - Parcours en Largeur", layout="wide")
 
@@ -206,12 +207,15 @@ if st.session_state.graph is not None:
             elapsed = time.time() - st.session_state.start_time
             st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
 
-    # --- MODE INITIAL ---
+    # --- MODE INITIAL : graphe statique ---
     else:
+        fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
         st.info("Sélectionne un nœud puis clique sur ▶️ Démarrer.")
 
 else:
     st.warning("Aucun graphe chargé.")
+
 
 # -----------------------------------------------------------
 # FOOTER

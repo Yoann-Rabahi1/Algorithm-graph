@@ -3,6 +3,8 @@ import time
 from dfs_functions import plot_dfs_step, dfs_steps
 from download_graph import create_french_cities_graph
 
+from plotly_graph import *
+
 st.set_page_config(page_title="DFS - Parcours en Profondeur", layout="wide")
 
 st.title("🌲 Visualisation de l'algorithme DFS (Depth-First Search)")
@@ -205,8 +207,10 @@ if st.session_state.graph is not None:
             elapsed = time.time() - st.session_state.start_time
             st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
 
-    # --- MODE INITIAL ---
+    # --- MODE INITIAL : afficher le graphe statique ---
     else:
+        fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
         st.info("Sélectionne un nœud puis clique sur ▶️ Démarrer.")
 
 else:

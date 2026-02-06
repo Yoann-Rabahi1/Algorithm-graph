@@ -124,20 +124,16 @@ if st.session_state.steps:
             elapsed = time.time() - st.session_state.start_time
             st.metric("Temps écoulé", f"{elapsed:.2f} sec")
 
-# -----------------------------------------------------------
-# VISUALISATION
-# -----------------------------------------------------------
+
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
 st.header("📊 Visualisation")
 graph_placeholder = st.empty()
 
-graph_placeholder = st.empty()
-
 if st.session_state.graph is not None:
 
-    # MODE ANIMATION
+    # --- MODE ANIMATION ---
     if st.session_state.running and not st.session_state.paused:
 
         if st.session_state.step_index < len(st.session_state.steps):
@@ -155,44 +151,40 @@ if st.session_state.graph is not None:
             st.session_state.finished = True
             st.rerun()
 
-    # MODE PAUSE / FIN
-    else:
+    # --- MODE PAUSE / FIN ---
+    elif st.session_state.steps:
 
-        # ⚠️ IMPORTANT : vérifier que steps n'est pas vide
-        if st.session_state.steps:
+        step = st.session_state.steps[min(
+            st.session_state.step_index,
+            len(st.session_state.steps) - 1
+        )]
 
-            # On récupère la dernière étape valide
-            step = st.session_state.steps[min(
-                st.session_state.step_index,
-                len(st.session_state.steps) - 1
-            )]
-
-            # --- AFFICHAGE DU GRAPHE ---
-            if st.session_state.finished:
-                fig = plot_kruskal_mst(st.session_state.graph, step["mst_edges"])
-            else:
-                fig = plot_kruskal_step(st.session_state.graph, step)
-
-            graph_placeholder.plotly_chart(fig, use_container_width=True)
-
-            # --- AFFICHAGE DES RÉSULTATS FINAUX ---
-            if st.session_state.finished:
-
-                # Coût total de l’ACPM
-                total_cost = sum(w for (_, _, w) in step["mst_edges"])
-                st.success(f"🌳 Coût total de l’ACPM : **{total_cost:.2f}**")
-
-                # Temps total
-                if st.session_state.start_time:
-                    elapsed = time.time() - st.session_state.start_time
-                    st.info(f"⏱️ Temps total d'exécution : **{elapsed:.2f} sec**")
-
+        # Affichage final ou intermédiaire
+        if st.session_state.finished:
+            fig = plot_kruskal_mst(st.session_state.graph, step["mst_edges"])
         else:
-            st.info("Clique sur ▶️ Démarrer pour lancer Kruskal.")
+            fig = plot_kruskal_step(st.session_state.graph, step)
+
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+
+        # Résultats finaux
+        if st.session_state.finished:
+
+            total_cost = sum(w for (_, _, w) in step["mst_edges"])
+            st.success(f"🌳 Coût total de l’ACPM : **{total_cost:.2f}**")
+
+            if st.session_state.start_time:
+                elapsed = time.time() - st.session_state.start_time
+                st.info(f"⏱️ Temps total d'exécution : **{elapsed:.2f} sec**")
+
+    # --- MODE INITIAL : afficher le graphe statique ---
+    else:
+        fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+        st.info("Clique sur ▶️ Démarrer pour lancer Kruskal.")
 
 else:
     st.warning("Aucun graphe chargé.")
-
 
 # -----------------------------------------------------------
 # FOOTER

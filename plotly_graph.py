@@ -5,14 +5,18 @@ import networkx as nx
 # ---------------------------------------------------------
 # Affichage simple du graphe
 # ---------------------------------------------------------
+
 def plot_graph_plotly(G, is_test_graph=False):
 
+    # --- Positionnement des nœuds ---
     if all('x' in G.nodes[n] and 'y' in G.nodes[n] for n in G.nodes()):
         pos = {n: (G.nodes[n]['x'], G.nodes[n]['y']) for n in G.nodes()}
     else:
         pos = nx.spring_layout(G, seed=42)
 
-    edge_x, edge_y, edge_labels = [], [], []
+    # --- Arêtes ---
+    edge_x, edge_y = [], []
+    weight_labels = []
 
     for u, v, data in G.edges(data=True):
         x0, y0 = pos[u]
@@ -21,14 +25,15 @@ def plot_graph_plotly(G, is_test_graph=False):
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
 
+        # Affichage des poids (test graph uniquement)
         if is_test_graph and "length" in data:
-            edge_labels.append(
+            weight_labels.append(
                 go.Scatter(
                     x=[(x0 + x1) / 2],
                     y=[(y0 + y1) / 2],
                     text=[str(data["length"])],
                     mode="text",
-                    textfont=dict(size=14, color="black"),
+                    textfont=dict(size=14, color="black", family="Arial Black"),
                     hoverinfo="skip"
                 )
             )
@@ -36,39 +41,43 @@ def plot_graph_plotly(G, is_test_graph=False):
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
         mode="lines",
-        line=dict(width=1, color="#BBBBBB"),
+        line=dict(width=1.5, color="#A0A0A0"),
         hoverinfo="none"
     )
 
-    node_x, node_y = [], []
+    # --- Nœuds ---
+    node_x, node_y, labels = [], [], []
     for n in G.nodes():
         x, y = pos[n]
         node_x.append(x)
         node_y.append(y)
+        labels.append(str(n))
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text" if is_test_graph else "markers",
-        text=[str(n) for n in G.nodes()] if is_test_graph else None,
+        mode="markers+text",
+        text=labels if is_test_graph else None,
         textposition="top center",
         marker=dict(
-            size=22 if is_test_graph else 8,
-            color="#1f77b4",
-            line=dict(width=2 if is_test_graph else 0.5, color="black")
+            size=28 if is_test_graph else 20,
+            color="black",
+            line=dict(width=3, color="white")
         ),
+        textfont=dict(size=14, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 
-    fig = go.Figure([edge_trace, node_trace])
-    for lbl in edge_labels:
-        fig.add_trace(lbl)
+    # --- Figure ---
+    fig = go.Figure([edge_trace, node_trace] + weight_labels)
 
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        plot_bgcolor="white"
+        height=600,
+        plot_bgcolor="lightblue",
+        paper_bgcolor="lightblue"
     )
 
     return fig

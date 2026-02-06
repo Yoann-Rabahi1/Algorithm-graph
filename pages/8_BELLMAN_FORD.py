@@ -39,7 +39,7 @@ with st.sidebar:
     st.header("⚙️ Configuration")
 
     if st.button("📥 Charger le graphe des métropoles", type="primary"):
-        st.session_state.graph = create_french_cities_graph()
+        st.session_state.graph = create_bellman_ford_graph()
         st.session_state.node_list = list(st.session_state.graph.nodes())
         st.success("Graphe chargé !")
         st.rerun()
@@ -47,21 +47,29 @@ with st.sidebar:
     if st.session_state.graph is not None:
         st.subheader("🎯 Source et cible")
 
+        nodes = st.session_state.node_list
+
+        # Sélection de la source
         start_idx = st.selectbox(
             "Source",
-            range(len(st.session_state.node_list)),
-            format_func=lambda i: str(st.session_state.node_list[i]),
+            range(len(nodes)),
+            format_func=lambda i: str(nodes[i]),
             index=0
         )
+
+        # Sélection de la cible, mais sans proposer la même valeur
+        possible_targets = [i for i in range(len(nodes)) if i != start_idx]
+
         end_idx = st.selectbox(
-            "Cible (optionnel)",
-            range(len(st.session_state.node_list)),
-            format_func=lambda i: str(st.session_state.node_list[i]),
-            index=min(1, len(st.session_state.node_list) - 1)
+            "Cible (ne peut pas être la source)",
+            possible_targets,
+            format_func=lambda i: str(nodes[i]),
+            index=0
         )
 
-        st.session_state.start_node = st.session_state.node_list[start_idx]
-        st.session_state.end_node = st.session_state.node_list[end_idx]
+        st.session_state.start_node = nodes[start_idx]
+        st.session_state.end_node = nodes[end_idx]
+
 
         st.subheader("⚡ Vitesse")
         speed = st.slider("Délai entre étapes (sec)", 0.01, 1.0, 0.2, 0.01)
@@ -147,11 +155,13 @@ if st.session_state.steps:
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
+
 st.header("📊 Visualisation")
 graph_placeholder = st.empty()
 
 if st.session_state.graph is not None:
 
+    # --- MODE ANIMATION ---
     if st.session_state.running and not st.session_state.paused:
 
         if st.session_state.step_index < len(st.session_state.steps):
@@ -175,44 +185,67 @@ if st.session_state.graph is not None:
             st.session_state.finished = True
             st.rerun()
 
-    else:
-        if st.session_state.steps:
-            step = st.session_state.steps[min(
-                st.session_state.step_index,
-                len(st.session_state.steps) - 1
-            )]
+    # --- MODE PAUSE / INTERMÉDIAIRE ---
+    elif st.session_state.steps and not st.session_state.finished:
 
-            fig = plot_bellman_ford_step(
-                st.session_state.graph,
-                step,
-                source=st.session_state.start_node,
-                target=st.session_state.end_node,
-                show_all_nodes=show_all if "show_all" in locals() else False
-            )
-            graph_placeholder.plotly_chart(fig, use_container_width=True)
+        step = st.session_state.steps[min(
+            st.session_state.step_index,
+            len(st.session_state.steps) - 1
+        )]
 
-            # affichage résultat
-            shows = step.get("phase")
-            if shows:
-                st.info(f"Phase: {shows}, itération: {step.get('iter')}")
+        fig = plot_bellman_ford_step(
+            st.session_state.graph,
+            step,
+            source=st.session_state.start_node,
+            target=st.session_state.end_node,
+            show_all_nodes=show_all if "show_all" in locals() else False
+        )
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
 
+        # Infos d’étape
+        phase = step.get("phase")
+        if phase:
+            st.info(f"Phase : {phase}, itération : {step.get('iter')}")
 
-            if step.get("neg_cycle"):
-                st.error("Cycle négatif détecté, les distances ne sont pas fiables.")
-            elif step.get("phase") == "final":
-                dist = step.get("dist", {})
-                tgt = st.session_state.end_node
-                if tgt in dist:
-                    d = dist[tgt]
-                    if d == math.inf:
-                        st.warning("Pas de chemin vers la cible.")
-                    else:
-                        st.success(f"Distance source → cible: {d:.2f}")
+        if step.get("neg_cycle"):
+            st.error("Cycle négatif détecté : distances non fiables.")
 
+    # --- MODE FIN : AFFICHAGE DU CHEMIN FINAL ---
+    elif st.session_state.finished:
+
+        final_step = st.session_state.steps[-1]
+
+        fig = plot_bellman_ford_final_path(
+            st.session_state.graph,
+            final_step,
+            st.session_state.start_node,
+            st.session_state.end_node
+        )
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+
+        # Résultat numérique
+        dist = final_step["dist"]
+        tgt = st.session_state.end_node
+
+        if final_step.get("neg_cycle"):
+            st.error("Cycle négatif détecté : distances non fiables.")
+        elif dist[tgt] == math.inf:
+            st.warning("Aucun chemin vers la cible.")
         else:
-            st.info("Clique sur ▶️ Démarrer.")
+            st.success(f"Distance minimale : {dist[tgt]:.2f}")
+
+        # Temps total
+        if st.session_state.start_time:
+            elapsed = time.time() - st.session_state.start_time
+            st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
+
+    # --- MODE INITIAL ---
+    else:
+        st.info("Clique sur ▶️ Démarrer pour lancer Bellman‑Ford.")
+
 else:
     st.warning("Aucun graphe chargé.")
+
 
 st.divider()
 st.markdown("""

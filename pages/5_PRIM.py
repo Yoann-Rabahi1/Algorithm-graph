@@ -3,6 +3,7 @@ import time
 
 from download_graph import create_french_cities_graph
 from prim_functions import *
+from plotly_graph import *
 
 st.set_page_config(page_title="Prim - MST", layout="wide")
 
@@ -129,11 +130,15 @@ if st.session_state.steps:
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
+# -----------------------------------------------------------
+# VISUALISATION
+# -----------------------------------------------------------
 st.header("📊 Visualisation")
 graph_placeholder = st.empty()
 
 if st.session_state.graph is not None:
 
+    # --- MODE ANIMATION ---
     if st.session_state.running and not st.session_state.paused:
 
         if st.session_state.step_index < len(st.session_state.steps):
@@ -151,28 +156,29 @@ if st.session_state.graph is not None:
             st.session_state.finished = True
             st.rerun()
 
+    # --- MODE PAUSE / FIN ---
+    elif st.session_state.steps:
+
+        step = st.session_state.steps[min(
+            st.session_state.step_index,
+            len(st.session_state.steps) - 1
+        )]
+
+        fig = plot_prim_step(st.session_state.graph, step)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+
+        st.success(f"Arêtes MST: {len(step['mst_edges'])}, coût: {step['total_cost']:.2f}")
+
+        if st.session_state.finished and st.session_state.start_time:
+            elapsed = time.time() - st.session_state.start_time
+            st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
+
+    # --- MODE INITIAL : afficher le graphe statique ---
     else:
-        if st.session_state.steps:
-            step = st.session_state.steps[min(
-                st.session_state.step_index,
-                len(st.session_state.steps) - 1
-            )]
+        fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+        st.info("Clique sur ▶️ Démarrer pour lancer Prim.")
 
-            if st.session_state.finished:
-                fig = plot_prim_step(st.session_state.graph, step)
-            else:
-                fig = plot_prim_step(st.session_state.graph, step)
-
-            graph_placeholder.plotly_chart(fig, use_container_width=True)
-
-            st.success(f"Arêtes MST: {len(step['mst_edges'])}, coût: {step['total_cost']:.2f}")
-
-            if st.session_state.finished and st.session_state.start_time:
-                elapsed = time.time() - st.session_state.start_time
-                st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
-
-        else:
-            st.info("Clique sur ▶️ Démarrer pour lancer Prim.")
 else:
     st.warning("Aucun graphe chargé.")
 
