@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 
-from download_graph import create_french_cities_graph
+from graphs.download_graph import create_french_cities_graph
 from prim_functions import *
 from plotly_graph import *
 

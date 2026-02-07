@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from algorithm import *
-from download_graph import *
+from graphs.download_graph import *
 import streamlit as st
 
 

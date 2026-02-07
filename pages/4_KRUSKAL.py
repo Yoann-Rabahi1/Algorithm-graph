@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 
-from download_graph import *
+from graphs.download_graph import *
 from kruskal_functions import *
 from plotly_graph import *
 

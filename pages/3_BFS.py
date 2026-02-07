@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from bfs_functions import bfs_steps, plot_bfs_step
-from download_graph import create_french_cities_graph
+from graphs.download_graph import create_french_cities_graph
 from plotly_graph import *
 
 st.set_page_config(page_title="BFS - Parcours en Largeur", layout="wide")

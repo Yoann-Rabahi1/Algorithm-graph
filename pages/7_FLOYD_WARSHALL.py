@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 
-from download_graph import create_french_cities_graph
+from graphs.download_graph import create_french_cities_graph
 from plotly_graph import plot_fw_pair, plot_fw_path
 from floyd_warshall_functions import floyd_warshall_steps, reconstruct_path_from_step
 

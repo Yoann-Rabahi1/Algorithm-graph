@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 from dfs_functions import plot_dfs_step, dfs_steps
-from download_graph import create_french_cities_graph
+from graphs.download_graph import create_french_cities_graph
 
 from plotly_graph import *
 
