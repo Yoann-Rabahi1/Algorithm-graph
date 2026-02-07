@@ -174,3 +174,119 @@ def plot_graph_with_points(G, start_node, end_node, is_test_graph=False):
     )
 
     return fig
+
+
+    import plotly.graph_objects as go
+
+def plot_fw_pair(G, src, dst):
+    # fond du graphe
+    all_edge_x, all_edge_y = [], []
+    for u, v in G.edges():
+        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+
+    bg_edges = go.Scatter(
+        x=all_edge_x, y=all_edge_y,
+        mode="lines",
+        line=dict(width=1, color="#e0e0e0"),
+        hoverinfo="none"
+    )
+
+    # noeuds
+    node_x, node_y, node_color, node_size = [], [], [], []
+    for n, data in G.nodes(data=True):
+        node_x.append(data["x"])
+        node_y.append(data["y"])
+        if n == src:
+            node_color.append("green")
+            node_size.append(14)
+        elif n == dst:
+            node_color.append("red")
+            node_size.append(14)
+        else:
+            node_color.append("#222")
+            node_size.append(8)
+
+    nodes_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers",
+        marker=dict(size=node_size, color=node_color, line=dict(width=1, color="white")),
+        hoverinfo="none"
+    )
+
+    fig = go.Figure([bg_edges, nodes_trace])
+    fig.update_layout(
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        height=600
+    )
+    return fig
+
+
+def plot_fw_path(G, path):
+    # fond du graphe
+    all_edge_x, all_edge_y = [], []
+    for u, v in G.edges():
+        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
+        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+
+    bg_edges = go.Scatter(
+        x=all_edge_x, y=all_edge_y,
+        mode="lines",
+        line=dict(width=1, color="#e0e0e0"),
+        hoverinfo="none"
+    )
+
+    # chemin (en bleu épais)
+    path_edge_x, path_edge_y = [], []
+    if path and len(path) >= 2:
+        for a, b in zip(path[:-1], path[1:]):
+            path_edge_x += [G.nodes[a]['x'], G.nodes[b]['x'], None]
+            path_edge_y += [G.nodes[a]['y'], G.nodes[b]['y'], None]
+
+    path_trace = go.Scatter(
+        x=path_edge_x, y=path_edge_y,
+        mode="lines",
+        line=dict(width=6, color="deepskyblue"),
+        hoverinfo="none"
+    )
+
+    # noeuds (src vert, dst rouge, chemin cyan)
+    node_x, node_y, node_color, node_size = [], [], [], []
+    src = path[0] if path else None
+    dst = path[-1] if path else None
+
+    for n, data in G.nodes(data=True):
+        node_x.append(data["x"])
+        node_y.append(data["y"])
+        if n == src:
+            node_color.append("green")
+            node_size.append(16)
+        elif n == dst:
+            node_color.append("red")
+            node_size.append(16)
+        elif path and n in set(path):
+            node_color.append("lightskyblue")
+            node_size.append(10)
+        else:
+            node_color.append("#222")
+            node_size.append(7)
+
+    nodes_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers",
+        marker=dict(size=node_size, color=node_color, line=dict(width=1, color="white")),
+        hoverinfo="none"
+    )
+
+    fig = go.Figure([bg_edges, path_trace, nodes_trace])
+    fig.update_layout(
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        height=600
+    )
+    return fig
