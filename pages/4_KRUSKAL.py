@@ -3,6 +3,7 @@ import time
 
 from graphs.download_graph import *
 from algorithms.kruskal_functions import *
+from error_handlings import validate_graph, validate_mst_graph
 from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="Kruskal - MST", layout="wide")
@@ -20,8 +21,6 @@ Cette page te permet de visualiser **Kruskal étape par étape**, exactement com
 - construction progressive du MST  
 - visualisation dynamique  
 - coût total final  
-
-Le graphe utilisé est **uniquement celui des métropoles françaises**.
 """)
 
 # -----------------------------------------------------------
@@ -47,6 +46,10 @@ with st.sidebar:
 
     if st.button("📥 Charger le graphe des métropoles", type="primary"):
         st.session_state.graph = create_french_cities_graph()
+
+        # 🔥 VALIDATION : graphe bien formé
+        validate_graph(st.session_state.graph)
+
         st.success("Graphe chargé !")
         st.rerun()
 
@@ -65,6 +68,10 @@ with col1:
         if st.session_state.graph is None:
             st.error("Charge d'abord le graphe des métropoles.")
         else:
+            # 🔥 VALIDATIONS AVANT DE LANCER KRUSKAL
+            validate_graph(st.session_state.graph)
+            validate_mst_graph(st.session_state.graph)
+
             st.session_state.running = True
             st.session_state.paused = False
             st.session_state.finished = False
@@ -124,7 +131,6 @@ if st.session_state.steps:
             elapsed = time.time() - st.session_state.start_time
             st.metric("Temps écoulé", f"{elapsed:.2f} sec")
 
-
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
@@ -159,7 +165,6 @@ if st.session_state.graph is not None:
             len(st.session_state.steps) - 1
         )]
 
-        # Affichage final ou intermédiaire
         if st.session_state.finished:
             fig = plot_kruskal_mst(st.session_state.graph, step["mst_edges"])
         else:
@@ -167,9 +172,7 @@ if st.session_state.graph is not None:
 
         graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-        # Résultats finaux
         if st.session_state.finished:
-
             total_cost = sum(w for (_, _, w) in step["mst_edges"])
             st.success(f"🌳 Coût total de l’ACPM : **{total_cost:.2f}**")
 
@@ -177,7 +180,7 @@ if st.session_state.graph is not None:
                 elapsed = time.time() - st.session_state.start_time
                 st.info(f"⏱️ Temps total d'exécution : **{elapsed:.2f} sec**")
 
-    # --- MODE INITIAL : afficher le graphe statique ---
+    # --- MODE INITIAL ---
     else:
         fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
         graph_placeholder.plotly_chart(fig, use_container_width=True)
@@ -199,6 +202,4 @@ L’algorithme de Kruskal construit un **arbre couvrant minimal (MST)** en :
 2. ajoutant les arêtes les plus légères,  
 3. évitant les cycles grâce à **union-find**,  
 4. jusqu’à connecter tout le graphe.
-
-Cette page te permet de suivre **chaque étape** de sa construction.
 """)

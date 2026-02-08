@@ -176,7 +176,6 @@ def plot_graph_with_points(G, start_node, end_node, is_test_graph=False):
     return fig
 
 
-    import plotly.graph_objects as go
 
 def plot_fw_pair(G, src, dst):
     # fond du graphe

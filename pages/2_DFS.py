@@ -2,7 +2,7 @@ import streamlit as st
 import time
 from algorithms.dfs_functions import plot_dfs_step, dfs_steps
 from graphs.download_graph import create_french_cities_graph
-
+from error_handlings import validate_start_node, validate_graph
 from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="DFS - Parcours en Profondeur", layout="wide")
@@ -47,6 +47,10 @@ with st.sidebar:
     if st.button("📥 Charger le graphe des métropoles", type="primary"):
         st.session_state.graph = create_french_cities_graph()
         st.session_state.node_list = list(st.session_state.graph.nodes())
+
+        # 🔥 VALIDATION : graphe bien formé
+        validate_graph(st.session_state.graph)
+
         st.success("Graphe chargé !")
         st.rerun()
 
@@ -76,6 +80,10 @@ with col1:
         if st.session_state.graph is None:
             st.error("Charge d'abord un graphe.")
         else:
+            # 🔥 VALIDATIONS AVANT DE LANCER DFS
+            validate_graph(st.session_state.graph)
+            validate_start_node(st.session_state.graph, st.session_state.start_node)
+
             st.session_state.running = True
             st.session_state.paused = False
             st.session_state.finished = False
@@ -199,15 +207,13 @@ if st.session_state.graph is not None:
 
         graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-        # Liste complète des visités dans l'ordre
         st.success(f"📌 Ordre de visite ({len(final_step['visit_order'])}) : {final_step['visit_order']}")
 
-        # Temps total
         if st.session_state.start_time:
             elapsed = time.time() - st.session_state.start_time
             st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
 
-    # --- MODE INITIAL : afficher le graphe statique ---
+    # --- MODE INITIAL ---
     else:
         fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
         graph_placeholder.plotly_chart(fig, use_container_width=True)
@@ -227,12 +233,6 @@ DFS explore un graphe en profondeur :
 - il suit un chemin jusqu’au bout,
 - puis revient en arrière,
 - puis explore un autre chemin.
-
-Il est utile pour :
-- explorer la structure d’un graphe,
-- détecter des cycles,
-- générer un arbre DFS,
-- analyser la connectivité.
 
 Cette page te permet de visualiser son fonctionnement étape par étape.
 """)

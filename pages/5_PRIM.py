@@ -3,6 +3,7 @@ import time
 
 from graphs.download_graph import create_french_cities_graph
 from algorithms.prim_functions import *
+from error_handlings import validate_graph, validate_mst_graph, validate_start_node
 from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="Prim - MST", layout="wide")
@@ -41,6 +42,10 @@ with st.sidebar:
 
     if st.button("📥 Charger le graphe des métropoles", type="primary"):
         st.session_state.graph = create_french_cities_graph()
+
+        # 🔥 VALIDATION : graphe bien formé
+        validate_graph(st.session_state.graph)
+
         st.success("Graphe chargé !")
         st.rerun()
 
@@ -64,6 +69,11 @@ with col1:
         if st.session_state.graph is None:
             st.error("Charge d'abord le graphe des métropoles.")
         else:
+            # 🔥 VALIDATIONS AVANT DE LANCER PRIM
+            validate_graph(st.session_state.graph)
+            validate_mst_graph(st.session_state.graph)
+            validate_start_node(st.session_state.graph, st.session_state.start_node)
+
             st.session_state.running = True
             st.session_state.paused = False
             st.session_state.finished = False
@@ -130,9 +140,6 @@ if st.session_state.steps:
 # -----------------------------------------------------------
 # VISUALISATION
 # -----------------------------------------------------------
-# -----------------------------------------------------------
-# VISUALISATION
-# -----------------------------------------------------------
 st.header("📊 Visualisation")
 graph_placeholder = st.empty()
 
@@ -173,7 +180,7 @@ if st.session_state.graph is not None:
             elapsed = time.time() - st.session_state.start_time
             st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
 
-    # --- MODE INITIAL : afficher le graphe statique ---
+    # --- MODE INITIAL ---
     else:
         fig = plot_graph_plotly(st.session_state.graph, is_test_graph=True)
         graph_placeholder.plotly_chart(fig, use_container_width=True)
