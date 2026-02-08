@@ -1,8 +1,6 @@
 import heapq
 import plotly.graph_objects as go
 import networkx as nx
-
-import heapq
 import math
 
 
@@ -69,6 +67,7 @@ def dijkstra_osmnx(G, source, target=None, weight="length"):
 
 
 def reconstruct_path(prev, source, target):
+    """Reconstruit le chemin de source à target"""
     path = []
     u = target
 
@@ -78,19 +77,29 @@ def reconstruct_path(prev, source, target):
 
     path.reverse()
 
-    if path[0] == source:
+    if path and path[0] == source:
         return path
     return []
 
 
 # ---------------------------------------------------------
-# Dijkstra étape par étape — VERSION FINALE
+# Dijkstra étape par étape — VERSION COMPLÈTE
 # ---------------------------------------------------------
 def dijkstra_steps(G, start, end=None):
+    """
+    Générateur Dijkstra étape par étape.
+    Sauvegarde toutes les distances à chaque itération pour la matrice.
+    """
     dist = {start: 0}
     parent = {start: None}
     visited = set()
     pq = [(0, start)]
+    
+    # Historique des distances pour la matrice
+    iterations = []
+    
+    # État initial
+    iterations.append(dict(dist))
 
     while pq:
         current_dist, u = heapq.heappop(pq)
@@ -103,14 +112,17 @@ def dijkstra_steps(G, start, end=None):
             "current": u,
             "dist": dict(dist),
             "parent": dict(parent),
-            "visited": set(visited)
+            "visited": set(visited),
+            "iterations": list(iterations)
         }
 
         # Pour OSMnx (MultiDiGraph), on utilise G[u] pour les voisins sortants
-        if u not in G: continue
+        if u not in G: 
+            continue
         
         for v in G[u]:
-            if v in visited: continue
+            if v in visited: 
+                continue
             
             edge_data = G.get_edge_data(u, v)
             if edge_data:
@@ -125,12 +137,66 @@ def dijkstra_steps(G, start, end=None):
                     dist[v] = new_dist
                     parent[v] = u
                     heapq.heappush(pq, (new_dist, v))
+        
+        # Sauvegarder l'état après traitement du nœud
+        iterations.append(dict(dist))
 
-    yield {"current": None, "dist": dict(dist), "parent": dict(parent), "visited": set(visited)}
+    yield {
+        "current": None, 
+        "dist": dict(dist), 
+        "parent": dict(parent), 
+        "visited": set(visited),
+        "iterations": list(iterations)
+    }
+
+
+def dijkstra_complete(G, start, end=None):
+    """
+    Version complète (non-itérative) de Dijkstra.
+    Retourne dist, parent, et toutes les itérations pour la matrice.
+    """
+    dist = {start: 0}
+    parent = {start: None}
+    visited = set()
+    pq = [(0, start)]
+    
+    iterations = []
+    iterations.append(dict(dist))
+
+    while pq:
+        current_dist, u = heapq.heappop(pq)
+
+        if u in visited:
+            continue
+        visited.add(u)
+
+        if u not in G:
+            continue
+        
+        for v in G[u]:
+            if v in visited:
+                continue
+            
+            edge_data = G.get_edge_data(u, v)
+            if edge_data:
+                if isinstance(edge_data, dict):
+                    weight = min(d.get('length', 1) for d in edge_data.values())
+                else:
+                    weight = edge_data.get('length', 1)
+                
+                new_dist = current_dist + weight
+                if new_dist < dist.get(v, float('inf')):
+                    dist[v] = new_dist
+                    parent[v] = u
+                    heapq.heappush(pq, (new_dist, v))
+        
+        iterations.append(dict(dist))
+
+    return dist, parent, visited, iterations
 
 
 # ---------------------------------------------------------
-# Étape Dijkstra – TOUS les nœuds
+# Étape Dijkstra — TOUS les nœuds
 # ---------------------------------------------------------
 def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
 
@@ -194,7 +260,7 @@ def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
 
 
 # ---------------------------------------------------------
-# Étape Dijkstra – dynamique
+# Étape Dijkstra — dynamique
 # ---------------------------------------------------------
 def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=False):
 
@@ -258,14 +324,19 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
 
 
 # ---------------------------------------------------------
-# Chemin final
+# Chemin final — VERSION AMÉLIORÉE
 # ---------------------------------------------------------
-
-
 def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
+    """
+    Affiche le graphe final avec :
+    - Chemin optimal en orange
+    - Distances affichées sur les nœuds
+    - Poids des arêtes du chemin
+    """
 
     parent = step["parent"]
     visited = step["visited"]
+    dist = step["dist"]
 
     # Reconstruction du chemin
     path = []
@@ -282,57 +353,112 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
     if not path or path[0] != start:
         return plot_dijkstra_step_dynamic(G, step, start, end, is_test_graph)
 
+    valid_path = len(path) >= 2
+
+    def xy(n):
+        return G.nodes[n]['x'], G.nodes[n]['y']
+
+    # --- Toutes les arêtes en arrière-plan ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        all_edge_x += [x0, x1, None]
+        all_edge_y += [y0, y1, None]
 
     all_edge_trace = go.Scatter(
         x=all_edge_x, y=all_edge_y,
         mode="lines",
-        line=dict(width=3, color="#e0e0e0"),
+        line=dict(width=1.5, color="#A0A0A0"),
         hoverinfo="none"
     )
 
+    # --- Arêtes du chemin optimal ---
     path_edge_x, path_edge_y = [], []
-    for i in range(len(path) - 1):
-        u, v = path[i], path[i + 1]
-        path_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        path_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+    if valid_path:
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            x0, y0 = xy(u)
+            x1, y1 = xy(v)
+            path_edge_x += [x0, x1, None]
+            path_edge_y += [y0, y1, None]
 
     path_trace = go.Scatter(
         x=path_edge_x, y=path_edge_y,
         mode="lines",
-        line=dict(width=6, color="green"),
+        line=dict(width=7, color="orange"),
         hoverinfo="none"
     )
 
+    # --- Poids des arêtes du chemin (optionnel) ---
+    edge_labels = []
+    if valid_path and is_test_graph:
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            if G.has_edge(u, v):
+                x0, y0 = xy(u)
+                x1, y1 = xy(v)
+                edge_data = G.get_edge_data(u, v)
+                if isinstance(edge_data, dict):
+                    w = min(d.get('length', 1) for d in edge_data.values())
+                else:
+                    w = edge_data.get('length', 1)
+                
+                edge_labels.append(
+                    go.Scatter(
+                        x=[(x0 + x1) / 2],
+                        y=[(y0 + y1) / 2],
+                        text=[f"{w:.0f}"],
+                        mode="text",
+                        textfont=dict(size=14, color="darkred", family="Arial Black"),
+                        hoverinfo="skip",
+                        showlegend=False
+                    )
+                )
+
+    # --- Nœuds avec distances ---
     node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
     for n in visited:
         if n not in G.nodes:
             continue
 
-        node_x.append(G.nodes[n]['x'])
-        node_y.append(G.nodes[n]['y'])
-        labels.append(str(n))
+        x, y = xy(n)
+        node_x.append(x)
+        node_y.append(y)
 
+        # Distance depuis le départ
+        d = dist.get(n, math.inf)
+        
+        # Label avec nom du nœud et distance
+        if is_test_graph:
+            if d != math.inf:
+                labels.append(f"{n}<br>{d:.0f}")
+            else:
+                labels.append(f"{n}<br>∞")
+        else:
+            labels.append(str(n))
+
+        # Couleurs et tailles
         if n == start:
             node_color.append("green")
-            node_size.append(55)
+            node_size.append(60)
         elif n == end:
             node_color.append("red")
-            node_size.append(55)
+            node_size.append(60)
         elif n in path:
-            node_color.append("lightgreen")
+            node_color.append("orange")
             node_size.append(55)
+        elif d != math.inf:
+            node_color.append("#031E66")
+            node_size.append(50)
         else:
-            node_color.append("black")
-            node_size.append(55)
+            node_color.append("#444444")
+            node_size.append(48)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
+        mode="markers+text" if is_test_graph else "markers",
         text=labels if is_test_graph else None,
         textposition="middle center",
         marker=dict(
@@ -340,18 +466,21 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
             color=node_color,
             line=dict(width=4, color="white")
         ),
-        textfont=dict(size=11, color="white", family="Arial Black"),
+        textfont=dict(size=12, color="white", family="Arial Black"),
         hoverinfo="text"
     )
 
-    fig = go.Figure([all_edge_trace, path_trace, node_trace])
+    # --- Construction de la figure ---
+    fig = go.Figure([all_edge_trace, path_trace, node_trace] + edge_labels)
+    
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
         plot_bgcolor="lightblue",
-        height=600
+        paper_bgcolor="lightblue",
+        height=650
     )
 
     return fig
