@@ -319,16 +319,42 @@ if st.session_state.running and not st.session_state.paused:
         st.rerun()
 
 # --- PAUSE / FIN ---
+# --- PAUSE / FIN ---
 elif st.session_state.steps:
 
     step = st.session_state.steps[min(st.session_state.step_index, len(st.session_state.steps) - 1)]
 
     if st.session_state.finished:
+        # 1) Affichage MST final
         fig = plot_prim_mst(G, step["mst_edges"], True)
-    else:
-        fig = plot_prim_step(G, step, True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
 
-    graph_placeholder.plotly_chart(fig, use_container_width=True)
+        # 2) Résultats comme "fin de parcours"
+        st.subheader("📋 Résultats de l’ACPM (Prim, graphe de test)")
+
+        mst_edges = step.get("mst_edges", [])
+        total_cost = sum(w for (_, _, w) in mst_edges)
+
+        st.success(f"🌳 Coût total : {total_cost:.2f}")
+        st.info(f"🔗 Arêtes : {len(mst_edges)}")
+
+        # Noeuds couverts par le MST
+        nodes_in_mst = set()
+        for u, v, w in mst_edges:
+            nodes_in_mst.add(u)
+            nodes_in_mst.add(v)
+        st.info(f"📊 Nœuds couverts : {len(nodes_in_mst)}/{len(G.nodes())}")
+
+        # Temps total
+        if st.session_state.start_time:
+            elapsed = time.time() - st.session_state.start_time
+            st.info(f"⏱️ Temps d'exécution : {elapsed:.2f} sec")
+
+    else:
+        # Étape intermédiaire
+        fig = plot_prim_step(G, step, True)
+        graph_placeholder.plotly_chart(fig, use_container_width=True)
+
 
 # --- MODE INITIAL ---
 else:
