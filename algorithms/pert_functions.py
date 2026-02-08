@@ -117,6 +117,59 @@ def pert_compute_steps(G):
     }
 
 
+def pert_compute_complete(G):
+    """
+    Version complète (non-itérative) de PERT.
+    Retourne ES, EF, LS, LF, slack, critical_nodes, critical_edges, project_duration
+    """
+    if not nx.is_directed_acyclic_graph(G):
+        raise ValueError("Le graphe PERT doit être un DAG (pas de cycle).")
+
+    dur = {n: float(G.nodes[n].get("duration", 0.0)) for n in G.nodes()}
+
+    ES = {n: 0.0 for n in G.nodes()}
+    EF = {n: 0.0 for n in G.nodes()}
+
+    order = list(nx.topological_sort(G))
+
+    # Forward pass
+    for n in order:
+        preds = list(G.predecessors(n))
+        ES[n] = max((EF[p] for p in preds), default=0.0)
+        EF[n] = ES[n] + dur[n]
+
+    project_duration = max(EF.values(), default=0.0)
+
+    # Backward pass
+    LS = {n: 0.0 for n in G.nodes()}
+    LF = {n: 0.0 for n in G.nodes()}
+
+    for n in reversed(order):
+        succs = list(G.successors(n))
+        LF[n] = min((LS[s] for s in succs), default=project_duration)
+        LS[n] = LF[n] - dur[n]
+
+    # Slack + critical
+    slack = {n: LS[n] - ES[n] for n in G.nodes()}
+    critical_nodes = {n for n in G.nodes() if abs(slack[n]) < 1e-9}
+
+    critical_edges = set()
+    for u, v in G.edges():
+        if u in critical_nodes and v in critical_nodes and abs(EF[u] - ES[v]) < 1e-9:
+            critical_edges.add((u, v))
+
+    return {
+        "ES": ES,
+        "EF": EF,
+        "LS": LS,
+        "LF": LF,
+        "slack": slack,
+        "critical_nodes": critical_nodes,
+        "critical_edges": critical_edges,
+        "project_duration": project_duration
+    }
+
+
 def plot_pert_step(G, step):
     """
     Visualisation Plotly style "animation"
@@ -218,4 +271,144 @@ def plot_pert_step(G, step):
         plot_bgcolor="lightblue",
         paper_bgcolor="lightblue"
     )
+    return fig
+
+
+def plot_pert_final(G, result):
+    """
+    Visualisation finale améliorée du PERT avec :
+    - Chemin critique en rouge épais
+    - Tâches critiques en rouge
+    - Tâches non-critiques en bleu avec marge affichée
+    - Informations complètes sur chaque nœud
+    """
+    level = topological_levels(G)
+
+    # positions (x par level, y par index dans la colonne)
+    cols = {}
+    for n, lv in level.items():
+        cols.setdefault(lv, []).append(n)
+    for lv in cols:
+        cols[lv].sort()
+
+    pos = {}
+    for lv, nodes in cols.items():
+        for i, n in enumerate(nodes):
+            pos[n] = (lv * 2.0, -i * 1.2)
+
+    crit_nodes = result.get("critical_nodes", set())
+    crit_edges = result.get("critical_edges", set())
+
+    ES = result.get("ES", {})
+    EF = result.get("EF", {})
+    LS = result.get("LS", {})
+    LF = result.get("LF", {})
+    slack = result.get("slack", {})
+
+    # --- Arêtes ---
+    ex_bg, ey_bg = [], []
+    ex_crit, ey_crit = [], []
+
+    for u, v in G.edges():
+        x0, y0 = pos[u]
+        x1, y1 = pos[v]
+        if (u, v) in crit_edges:
+            ex_crit += [x0, x1, None]
+            ey_crit += [y0, y1, None]
+        else:
+            ex_bg += [x0, x1, None]
+            ey_bg += [y0, y1, None]
+
+    edge_bg = go.Scatter(
+        x=ex_bg, y=ey_bg,
+        mode="lines",
+        line=dict(width=2, color="#A0A0A0"),
+        hoverinfo="none",
+        name="Arêtes normales"
+    )
+
+    edge_crit = go.Scatter(
+        x=ex_crit, y=ey_crit,
+        mode="lines",
+        line=dict(width=7, color="red"),
+        hoverinfo="none",
+        name="Chemin critique"
+    )
+
+    # --- Nœuds avec informations détaillées ---
+    nxs, nys, texts, colors, sizes = [], [], [], [], []
+    
+    for n in G.nodes():
+        x, y = pos[n]
+        nxs.append(x)
+        nys.append(y)
+
+        d = G.nodes[n].get("duration", 0)
+        es = ES.get(n, 0)
+        ef = EF.get(n, 0)
+        ls = LS.get(n, 0)
+        lf = LF.get(n, 0)
+        s = slack.get(n, 0)
+        
+        # Label détaillé
+        t = f"<b>{n}</b><br>"
+        t += f"Durée: {d:.0f}<br>"
+        t += f"ES: {es:.0f} | EF: {ef:.0f}<br>"
+        t += f"LS: {ls:.0f} | LF: {lf:.0f}<br>"
+        t += f"Marge: {s:.0f}"
+        
+        texts.append(t)
+
+        # Couleurs selon criticité
+        if n in crit_nodes:
+            colors.append("red")
+            sizes.append(60)
+        else:
+            colors.append("#031E66")
+            sizes.append(55)
+
+    nodes = go.Scatter(
+        x=nxs, y=nys,
+        mode="markers",
+        marker=dict(
+            size=sizes, 
+            color=colors, 
+            line=dict(width=4, color="white")
+        ),
+        hoverinfo="text",
+        text=texts,
+        name="Tâches"
+    )
+
+    # --- Labels des tâches (nom + durée) ---
+    label_x, label_y, label_texts = [], [], []
+    for n in G.nodes():
+        x, y = pos[n]
+        label_x.append(x)
+        label_y.append(y)
+        d = G.nodes[n].get("duration", 0)
+        label_texts.append(f"{n}<br>d={d:.0f}")
+
+    labels = go.Scatter(
+        x=label_x, y=label_y,
+        mode="text",
+        text=label_texts,
+        textposition="middle center",
+        textfont=dict(size=12, color="white", family="Arial Black"),
+        hoverinfo="skip",
+        showlegend=False
+    )
+
+    fig = go.Figure([edge_bg, edge_crit, nodes, labels])
+    
+    fig.update_layout(
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        height=650,
+        plot_bgcolor="lightblue",
+        paper_bgcolor="lightblue"
+    )
+    
     return fig
