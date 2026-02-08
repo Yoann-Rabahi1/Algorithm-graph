@@ -206,30 +206,33 @@ with col5:
         st.rerun()
 
 # ⚡ ACPM Direct
+# ⚡ ACPM Direct (uniquement pour les graphes OSM)
 with col6:
-    if st.button("⚡ ACPM Direct"):
-        G = st.session_state.graph
-        if G is None:
-            st.error("Charge d'abord un graphe.")
-        else:
-            st.session_state.start_time = time.time()
-
-            if not st.session_state.is_test_graph:
-                G2 = nx.to_undirected(G)
+    if not st.session_state.is_test_graph:
+        if st.button("⚡ ACPM Direct"):
+            G = st.session_state.graph
+            if G is None:
+                st.error("Charge d'abord un graphe.")
             else:
-                G2 = G
+                st.session_state.start_time = time.time()
 
-            T = nx.minimum_spanning_tree(G2, weight="length")
+                # Conversion en graphe non orienté si nécessaire
+                G2 = nx.to_undirected(G)
 
-            st.session_state.mst_graph = T
-            st.session_state.mst_computed = True
-            st.session_state.running = False
-            st.session_state.paused = False
-            st.session_state.finished = False
-            st.session_state.steps = []
+                T = nx.minimum_spanning_tree(G2, weight="length")
 
-            st.success("🌳 ACPM calculé !")
-            st.rerun()
+                st.session_state.mst_graph = T
+                st.session_state.mst_computed = True
+                st.session_state.running = False
+                st.session_state.paused = False
+                st.session_state.finished = False
+                st.session_state.steps = []
+
+                st.success("🌳 ACPM calculé !")
+                st.rerun()
+    else:
+        st.info("⚡ Le calcul direct est désactivé pour le graphe de test.")
+
 
 # ============================================================
 # VISUALISATION
