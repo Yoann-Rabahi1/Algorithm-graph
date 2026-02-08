@@ -13,6 +13,17 @@ from error_handlings import (
 )
 from vizualisation.plotly_graph import *
 
+PAGE_ID = "PRIM"
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = PAGE_ID
+
+# 🔁 Si on change de page → reset complet
+if st.session_state.current_page != PAGE_ID:
+    st.session_state.clear()
+    st.session_state.current_page = PAGE_ID
+    st.rerun()
+
 st.set_page_config(page_title="Prim - MST", layout="wide")
 st.title("🌲 Visualisation de l'algorithme de Prim")
 

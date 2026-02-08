@@ -9,6 +9,17 @@ from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="Bellman-Ford", layout="wide")
 
+PAGE_ID = "BELLMAN_FORD"
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = PAGE_ID
+
+# 🔁 Si on change de page → reset complet
+if st.session_state.current_page != PAGE_ID:
+    st.session_state.clear()
+    st.session_state.current_page = PAGE_ID
+    st.rerun()
+
 # -----------------------------------------------------------
 # TITRE + INTRO
 # -----------------------------------------------------------

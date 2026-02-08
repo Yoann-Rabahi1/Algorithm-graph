@@ -5,6 +5,17 @@ from graphs.download_graph import create_french_cities_graph
 from error_handlings import validate_graph, validate_start_node
 from vizualisation.plotly_graph import *
 
+PAGE_ID = "BFS"
+
+if "current_page" not in st.session_state:
+    st.session_state.current_page = PAGE_ID
+
+# 🔁 Si on change de page → reset complet
+if st.session_state.current_page != PAGE_ID:
+    st.session_state.clear()
+    st.session_state.current_page = PAGE_ID
+    st.rerun()
+
 st.set_page_config(page_title="BFS - Parcours en Largeur", layout="wide")
 
 st.title("🌳 Visualisation de l'algorithme BFS (Breadth-First Search)")
