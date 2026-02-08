@@ -38,17 +38,16 @@ def create_bellman_ford_graph():
 
 
 # ============================================================
-# 2) Bellman-Ford (version propre, EXACTEMENT n-1 itérations)
+# 2) Bellman-Ford (version corrigée avec itération 0)
 # ============================================================
 
 def bellman_ford_run(G, source, weight="length"):
     """
-    Version propre et standard :
-    - EXACTEMENT |V|-1 itérations
-    - pas d'early break
-    - distances correctes
-    - parent correct
-    - détection cycle négatif
+    Version corrigée :
+    - Sauvegarde l'état initial (itération 0)
+    - EXACTEMENT |V|-1 itérations de relaxation
+    - Détection de cycle négatif
+    - Retourne toutes les itérations pour la matrice
     """
 
     dist = {n: math.inf for n in G.nodes()}
@@ -64,14 +63,18 @@ def bellman_ford_run(G, source, weight="length"):
     iterations = []
     n = len(G.nodes())
 
+    # --- Sauvegarde de l'état initial (itération 0) ---
+    iterations.append(dict(dist))
+
     # --- Relaxations : EXACTEMENT n-1 fois ---
-    for _ in range(n - 1):
+    for iteration_num in range(n - 1):
+        # Pour chaque itération, on relaxe toutes les arêtes
         for u, v, w in edges:
             if dist[u] != math.inf and dist[u] + w < dist[v]:
                 dist[v] = dist[u] + w
                 parent[v] = u
 
-        # snapshot de l'itération
+        # Snapshot après cette itération
         iterations.append(dict(dist))
 
     # --- Détection cycle négatif ---
@@ -85,7 +88,7 @@ def bellman_ford_run(G, source, weight="length"):
 
 
 # ============================================================
-# 3) Reconstruction du chemin final
+# 3) Reconstruction du chemin final (version améliorée)
 # ============================================================
 
 def reconstruct_path(parent, source, target):
@@ -99,10 +102,11 @@ def reconstruct_path(parent, source, target):
     path = []
     cur = target
     seen = set()
+    max_steps = len(parent) + 1  # Sécurité contre les boucles infinies
 
-    while cur is not None:
+    while cur is not None and len(path) < max_steps:
         if cur in seen:
-            return []  # sécurité
+            return []  # Détection de cycle
         seen.add(cur)
         path.append(cur)
         if cur == source:
@@ -110,22 +114,25 @@ def reconstruct_path(parent, source, target):
         cur = parent.get(cur)
 
     path.reverse()
+    
+    # Vérifier que le chemin commence bien à la source
     if not path or path[0] != source:
         return []
+    
     return path
 
 
 # ============================================================
-# 4) Visualisation finale (inchangée mais propre)
+# 4) Visualisation finale (version corrigée)
 # ============================================================
 
 def plot_bellman_ford_final_path(G, step, source, target):
     """
-    Affiche le graphe final :
-    - chemin final en orange
-    - source en vert
-    - cible en rouge
-    - nœuds atteignables en bleu foncé
+    Affiche le graphe final avec :
+    - Toutes les arêtes en gris clair
+    - Le chemin optimal en orange épais
+    - Les distances correctes affichées sur chaque nœud
+    - Source en vert, cible en rouge
     """
 
     dist = step["dist"]
@@ -138,7 +145,7 @@ def plot_bellman_ford_final_path(G, step, source, target):
     def xy(n):
         return G.nodes[n]["x"], G.nodes[n]["y"]
 
-    # --- Arrière-plan ---
+    # --- Toutes les arêtes en arrière-plan ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
@@ -150,10 +157,11 @@ def plot_bellman_ford_final_path(G, step, source, target):
         x=all_edge_x, y=all_edge_y,
         mode="lines",
         line=dict(width=1.5, color="#A0A0A0"),
-        hoverinfo="none"
+        hoverinfo="none",
+        name="Arêtes"
     )
 
-    # --- Arêtes du chemin final ---
+    # --- Arêtes du chemin optimal ---
     path_x, path_y = [], []
     if valid_path:
         for i in range(len(path) - 1):
@@ -167,10 +175,32 @@ def plot_bellman_ford_final_path(G, step, source, target):
         x=path_x, y=path_y,
         mode="lines",
         line=dict(width=7, color="orange"),
-        hoverinfo="none"
+        hoverinfo="none",
+        name="Chemin optimal"
     )
 
-    # --- Nœuds ---
+    # --- Poids des arêtes (optionnel, sur les arêtes du chemin) ---
+    edge_labels = []
+    if valid_path:
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            if G.has_edge(u, v):
+                x0, y0 = xy(u)
+                x1, y1 = xy(v)
+                w = G[u][v].get('length', 0)
+                edge_labels.append(
+                    go.Scatter(
+                        x=[(x0 + x1) / 2],
+                        y=[(y0 + y1) / 2],
+                        text=[f"{w:+.0f}"],
+                        mode="text",
+                        textfont=dict(size=14, color="darkred", family="Arial Black"),
+                        hoverinfo="skip",
+                        showlegend=False
+                    )
+                )
+
+    # --- Nœuds avec distances ---
     node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
     for n in G.nodes():
@@ -179,24 +209,30 @@ def plot_bellman_ford_final_path(G, step, source, target):
         node_y.append(y)
 
         d = dist.get(n, math.inf)
-        label = f"{n}<br>dist={d:.2f}" if d != math.inf else f"{n}<br>dist=∞"
+        
+        # Label avec nom du nœud et distance
+        if d != math.inf:
+            label = f"{n}<br>{d:.1f}"
+        else:
+            label = f"{n}<br>∞"
         labels.append(label)
 
+        # Couleurs et tailles selon le rôle du nœud
         if n == source:
             node_color.append("green")
-            node_size.append(55)
+            node_size.append(60)
         elif n == target:
             node_color.append("red")
-            node_size.append(55)
+            node_size.append(60)
         elif valid_path and n in path:
             node_color.append("orange")
-            node_size.append(50)
+            node_size.append(52)
         elif d != math.inf:
             node_color.append("#031E66")
-            node_size.append(45)
+            node_size.append(48)
         else:
-            node_color.append("black")
-            node_size.append(40)
+            node_color.append("#444444")
+            node_size.append(45)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -209,10 +245,13 @@ def plot_bellman_ford_final_path(G, step, source, target):
             line=dict(width=4, color="white")
         ),
         textfont=dict(size=12, color="white", family="Arial Black"),
-        hoverinfo="text"
+        hoverinfo="text",
+        name="Nœuds"
     )
 
-    fig = go.Figure([bg_edges, path_trace, node_trace])
+    # --- Construction de la figure ---
+    fig = go.Figure([bg_edges, path_trace, node_trace] + edge_labels)
+    
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
