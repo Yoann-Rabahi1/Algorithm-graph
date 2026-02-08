@@ -3,9 +3,11 @@ import networkx as nx
 
 def get_graph(place: str, network_type="drive"):
     """
-    Télécharge un graphe depuis OpenStreetMap
+    Télécharge un graphe depuis OpenStreetMap et ajoute les attributs x/y
     """
     G = ox.graph_from_place(place, network_type=network_type)
+    G = G.to_undirected()
+
     return G
 
 

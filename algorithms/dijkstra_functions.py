@@ -202,11 +202,22 @@ def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
 
     visited = step["visited"]
     current = step["current"]
+    
+    # Fonction pour obtenir les coordonnées (OSMnx ou graphe de test)
+    def get_coords(node):
+        if 'x' in G.nodes[node] and 'y' in G.nodes[node]:
+            return G.nodes[node]['x'], G.nodes[node]['y']
+        elif 'x' in G.nodes[node]:  # OSMnx utilise x=longitude, y=latitude
+            return G.nodes[node]['x'], G.nodes[node]['y']
+        else:
+            return 0, 0
 
     edge_x, edge_y = [], []
     for u, v in G.edges():
-        edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        ux, uy = get_coords(u)
+        vx, vy = get_coords(v)
+        edge_x += [ux, vx, None]
+        edge_y += [uy, vy, None]
 
     edge_trace = go.Scatter(
         x=edge_x, y=edge_y,
@@ -218,8 +229,9 @@ def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
     node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
     for n in G.nodes():
-        node_x.append(G.nodes[n]['x'])
-        node_y.append(G.nodes[n]['y'])
+        nx_coord, ny_coord = get_coords(n)
+        node_x.append(nx_coord)
+        node_y.append(ny_coord)
         labels.append(str(n))
 
         if n == current:
@@ -268,11 +280,20 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
     current = step["current"]
 
     highlight = visited | {n for n in [start, end, current] if n is not None}
+    
+    # Fonction pour obtenir les coordonnées
+    def get_coords(node):
+        if 'x' in G.nodes[node] and 'y' in G.nodes[node]:
+            return G.nodes[node]['x'], G.nodes[node]['y']
+        else:
+            return 0, 0
 
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        ux, uy = get_coords(u)
+        vx, vy = get_coords(v)
+        all_edge_x += [ux, vx, None]
+        all_edge_y += [uy, vy, None]
 
     all_edge_trace = go.Scatter(
         x=all_edge_x, y=all_edge_y,
@@ -284,8 +305,9 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
     node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
     for n in highlight:
-        node_x.append(G.nodes[n]['x'])
-        node_y.append(G.nodes[n]['y'])
+        nx_coord, ny_coord = get_coords(n)
+        node_x.append(nx_coord)
+        node_y.append(ny_coord)
         labels.append(str(n))
 
         if n == current:
@@ -355,8 +377,12 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
 
     valid_path = len(path) >= 2
 
+    # Fonction pour obtenir les coordonnées
     def xy(n):
-        return G.nodes[n]['x'], G.nodes[n]['y']
+        if 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+            return G.nodes[n]['x'], G.nodes[n]['y']
+        else:
+            return 0, 0
 
     # --- Toutes les arêtes en arrière-plan ---
     all_edge_x, all_edge_y = [], []
