@@ -89,76 +89,48 @@ with st.sidebar:
         with st.spinner("Chargement du graphe..."):
             try:
                 if load_method == "Télécharger depuis OSM":
-                    st.session_state.graph = get_graph(
-                        place_name,
-                        network_type=network_type
-                    )
+                    G = get_graph(place_name, network_type=network_type)
                     st.session_state.is_test_graph = False
                     st.success("✅ Graphe téléchargé depuis OSM !")
                 else:
-                    st.session_state.graph = create_french_cities_graph()
+                    G = create_french_cities_graph()
                     st.session_state.is_test_graph = True
-                    st.success("✅ Graphe de test (Villes françaises) créé !")
+                    st.success("✅ Graphe de test chargé !")
                 
-                # 🔥 VALIDATIONS
-                validate_graph(st.session_state.graph)
-                validate_dijkstra(st.session_state.graph)
-                validate_coordinates(st.session_state.graph)
+                # Validations
+                validate_graph(G)
+                validate_mst_graph(G)
 
-                st.session_state.graph_loaded = True
-                st.session_state.node_list = list(st.session_state.graph.nodes())
-                st.session_state.computed = False
+                st.session_state.graph = G
+                st.session_state.steps = []
+                st.session_state.mst_computed = False
+                st.session_state.step_index = 0
+                st.session_state.running = False
+                st.session_state.paused = False
+                st.session_state.finished = False
+
                 st.rerun()
-                
+            
             except Exception as e:
                 st.error(f"❌ Erreur lors du chargement : {str(e)}")
     
-    if st.session_state.graph_loaded:
+    # Si un graphe est chargé
+    if st.session_state.graph is not None:
         st.divider()
         st.success("✅ Graphe chargé")
-        st.info(f"📊 **Nœuds**: {len(st.session_state.graph.nodes())}")
-        st.info(f"🔗 **Arêtes**: {len(st.session_state.graph.edges())}")
-        
+        st.info(f"📊 **Nœuds** : {len(st.session_state.graph.nodes())}")
+        st.info(f"🔗 **Arêtes** : {len(st.session_state.graph.edges())}")
+
         st.divider()
-        
-        # Section 2: Sélection des nœuds
-        st.subheader("🎯 Points de départ et d'arrivée")
-        
-        if len(st.session_state.node_list) > 0:
-
-            max_display = len(st.session_state.node_list)
-
-            start_idx = st.selectbox(
-                "Nœud de départ",
-                range(max_display),
-                index=0,
-                format_func=lambda x: f"{str(st.session_state.node_list[x])}"
-            )
-
-            end_idx = st.selectbox(
-                "Nœud d'arrivée",
-                range(max_display),
-                index=min(5, max_display-1),
-                format_func=lambda x: f"{str(st.session_state.node_list[x])}"
-            )
-
-            start_node_id = st.session_state.node_list[start_idx]
-            end_node_id = st.session_state.node_list[end_idx]
-
-            if start_node_id == end_node_id:
-                st.error("⚠️ Le nœud de départ et d'arrivée doivent être différents.")
-                st.stop()
-
-        else:
-            start_node_id = None
-            end_node_id = None
+        st.subheader("⚡ Vitesse de l'animation")
+        speed = st.slider(
+            "Délai entre étapes (sec)",
+            0.01, 1.0, 0.2, 0.01
+        )
 
     else:
         st.warning("⚠️ Chargez d'abord un graphe")
-        start_node_id = None
-        end_node_id = None
-    
-    st.divider()
+
     
     st.subheader("⚡ Vitesse de l'animation")
     

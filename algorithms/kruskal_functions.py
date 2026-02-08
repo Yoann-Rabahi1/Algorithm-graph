@@ -73,13 +73,23 @@ def kruskal_steps(G, weight="length"):
 # ---------------------------------------------------------
 # Affichage du MST final
 # ---------------------------------------------------------
-def plot_kruskal_mst(G, mst_edges):
+def plot_kruskal_mst(G, mst_edges, is_test_graph=False):
 
-    # Arrière-plan : toutes les arêtes
+    # Fonction sécurisée pour récupérer les coordonnées
+    def xy(n):
+        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+            return G.nodes[n]['x'], G.nodes[n]['y']
+        return None, None
+
+    # --- Arrière-plan ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        all_edge_x += [x0, x1, None]
+        all_edge_y += [y0, y1, None]
 
     bg_edges = go.Scatter(
         x=all_edge_x, y=all_edge_y,
@@ -88,27 +98,30 @@ def plot_kruskal_mst(G, mst_edges):
         hoverinfo="none"
     )
 
-    # Labels des poids du MST
-    weight_labels = []
-    for u, v, w in mst_edges:
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        weight_labels.append(
-            go.Scatter(
-                x=[(x0 + x1) / 2],
-                y=[(y0 + y1) / 2],
-                text=[str(w)],
-                mode="text",
-                textfont=dict(size=14, color="black", family="Arial Black"),
-                hoverinfo="skip"
-            )
-        )
-
-    # Arêtes MST
+    # --- Arêtes MST ---
     mst_x, mst_y = [], []
+    weight_labels = []
+
     for u, v, w in mst_edges:
-        mst_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        mst_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+
+        mst_x += [x0, x1, None]
+        mst_y += [y0, y1, None]
+
+        if is_test_graph:
+            weight_labels.append(
+                go.Scatter(
+                    x=[(x0 + x1) / 2],
+                    y=[(y0 + y1) / 2],
+                    text=[str(w)],
+                    mode="text",
+                    textfont=dict(size=14, color="black", family="Arial Black"),
+                    hoverinfo="skip"
+                )
+            )
 
     mst_trace = go.Scatter(
         x=mst_x, y=mst_y,
@@ -117,23 +130,28 @@ def plot_kruskal_mst(G, mst_edges):
         hoverinfo="none"
     )
 
-    # Nœuds + labels
-    node_x, node_y, labels = [], [], []
-    for n, data in G.nodes(data=True):
-        node_x.append(data["x"])
-        node_y.append(data["y"])
+    # --- Nœuds ---
+    node_x, node_y, labels, node_color, node_size = [], [], [], [], []
+
+    for n in G.nodes():
+        x, y = xy(n)
+        if x is None:
+            continue
+
+        node_x.append(x)
+        node_y.append(y)
         labels.append(str(n))
+
+        node_color.append("black" if n not in {u for u, v, w in mst_edges} else "green")
+
+        node_size.append(22 if is_test_graph else 10)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
-        text=labels,
+        mode="markers+text" if is_test_graph else "markers",
+        text=labels if is_test_graph else None,
         textposition="top center",
-        marker=dict(
-            size=22,
-            color="black",
-            line=dict(width=2, color="white")
-        ),
+        marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
         textfont=dict(size=12, color="white", family="Arial Black"),
         hoverinfo="text"
     )
@@ -154,23 +172,27 @@ def plot_kruskal_mst(G, mst_edges):
 # ---------------------------------------------------------
 # Affichage dynamique étape par étape
 # ---------------------------------------------------------
-def plot_kruskal_step(G, step):
+def plot_kruskal_step(G, step, is_test_graph=False):
 
     current = step["current_edge"]
     mst_edges = step["mst_edges"]
     visited = step["visited_edges"]
 
-    # Déterminer les nœuds visités (comme dans Prim)
-    visited_nodes = set()
-    for u, v, w in mst_edges:
-        visited_nodes.add(u)
-        visited_nodes.add(v)
+    # Fonction sécurisée
+    def xy(n):
+        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+            return G.nodes[n]['x'], G.nodes[n]['y']
+        return None, None
 
-    # Arrière-plan
+    # --- Arrière-plan ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
-        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        all_edge_x += [x0, x1, None]
+        all_edge_y += [y0, y1, None]
 
     bg_edges = go.Scatter(
         x=all_edge_x, y=all_edge_y,
@@ -179,27 +201,30 @@ def plot_kruskal_step(G, step):
         hoverinfo="none"
     )
 
-    # Poids des arêtes visitées
-    weight_labels = []
-    for u, v, w in visited:
-        x0, y0 = G.nodes[u]['x'], G.nodes[u]['y']
-        x1, y1 = G.nodes[v]['x'], G.nodes[v]['y']
-        weight_labels.append(
-            go.Scatter(
-                x=[(x0 + x1) / 2],
-                y=[(y0 + y1) / 2],
-                text=[str(w)],
-                mode="text",
-                textfont=dict(size=14, color="black", family="Arial Black"),
-                hoverinfo="skip"
-            )
-        )
-
-    # Arêtes visitées (orange)
+    # --- Arêtes visitées ---
     vis_x, vis_y = [], []
+    weight_labels = []
+
     for u, v, w in visited:
-        vis_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        vis_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+
+        vis_x += [x0, x1, None]
+        vis_y += [y0, y1, None]
+
+        if is_test_graph:
+            weight_labels.append(
+                go.Scatter(
+                    x=[(x0 + x1) / 2],
+                    y=[(y0 + y1) / 2],
+                    text=[str(w)],
+                    mode="text",
+                    textfont=dict(size=14, color="black", family="Arial Black"),
+                    hoverinfo="skip"
+                )
+            )
 
     visited_trace = go.Scatter(
         x=vis_x, y=vis_y,
@@ -208,11 +233,15 @@ def plot_kruskal_step(G, step):
         hoverinfo="none"
     )
 
-    # Arêtes MST (vert)
+    # --- Arêtes MST ---
     mst_x, mst_y = [], []
     for u, v, w in mst_edges:
-        mst_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        mst_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        mst_x += [x0, x1, None]
+        mst_y += [y0, y1, None]
 
     mst_trace = go.Scatter(
         x=mst_x, y=mst_y,
@@ -221,41 +250,48 @@ def plot_kruskal_step(G, step):
         hoverinfo="none"
     )
 
-    # Arête courante (jaune)
+    # --- Arête courante ---
     if current is not None:
         u, v, w = current
-        cur_trace = go.Scatter(
-            x=[G.nodes[u]['x'], G.nodes[v]['x']],
-            y=[G.nodes[u]['y'], G.nodes[v]['y']],
-            mode="lines",
-            line=dict(width=6, color="yellow"),
-            hoverinfo="none"
-        )
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is not None and x1 is not None:
+            cur_trace = go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(width=6, color="yellow"),
+                hoverinfo="none"
+            )
+        else:
+            cur_trace = go.Scatter(x=[], y=[])
     else:
         cur_trace = go.Scatter(x=[], y=[])
 
-    # Nœuds + labels (style Dijkstra + visited en bleu)
-    node_x, node_y, labels, colors = [], [], [], []
-    for n, data in G.nodes(data=True):
-        node_x.append(data["x"])
-        node_y.append(data["y"])
+    # --- Nœuds ---
+    node_x, node_y, labels, colors, node_size = [], [], [], [], []
+
+    visited_nodes = {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}
+
+    for n in G.nodes():
+        x, y = xy(n)
+        if x is None:
+            continue
+
+        node_x.append(x)
+        node_y.append(y)
         labels.append(str(n))
 
-        if n in visited_nodes:
-            colors.append("#1E90FF")  # bleu vif
-        else:
-            colors.append("black")    # noir
+        colors.append("#1E90FF" if n in visited_nodes else "black")
+
+        node_size.append(28 if is_test_graph else 10)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
-        text=labels,
+        mode="markers+text" if is_test_graph else "markers",
+        text=labels if is_test_graph else None,
         textposition="top center",
-        marker=dict(
-            size=28,
-            color=colors,
-            line=dict(width=3, color="white")
-        ),
+        marker=dict(size=node_size, color=colors, line=dict(width=3, color="white")),
         textfont=dict(size=14, color="white", family="Arial Black"),
         hoverinfo="text"
     )
