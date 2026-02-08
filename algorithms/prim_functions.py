@@ -4,132 +4,134 @@ import plotly.graph_objects as go
 # ---------------------------------------------------------
 # Générateur étape par étape pour Prim
 # ---------------------------------------------------------
-def prim_steps(G, start_node=None, weight="length"):
+def prim_steps(G, start, weight="length"):
     """
-    Générateur étape par étape pour Prim (MST).
-    Le graphe est considéré comme non orienté pour Prim.
+    Générateur étape par étape pour Prim.
+    Renvoie à chaque étape :
+    - current_node : nœud en cours de traitement
+    - current_edge : arête choisie à cette étape
+    - mst_edges : arêtes déjà ajoutées au MST
+    - visited : nœuds déjà intégrés au MST
+    - key : valeur minimale pour connecter chaque nœud
+    - parent : parent de chaque nœud dans le MST
+    - queue : file de priorité (clé, u, v)
     """
 
-    nodes = list(G.nodes())
-    if not nodes:
-        yield {
-            "current_edge": None,
-            "candidate_edge": None,
-            "mst_edges": [],
-            "visited_nodes": set(),
-            "total_cost": 0.0
-        }
-        return
-
-    if start_node is None:
-        start_node = nodes[0]
-
-    visited = set([start_node])
+    # Initialisation
+    visited = set()
     mst_edges = []
-    total_cost = 0.0
 
-    pq = []
+    key = {n: float("inf") for n in G.nodes()}
+    parent = {n: None for n in G.nodes()}
 
-    def push_edges_from(u):
-        # voisins sortants
-        for v in G.successors(u):
-            edges = G.get_edge_data(u, v)
-            if edges:
-                w = min(ed.get(weight, 1) for ed in edges.values())
-                heapq.heappush(pq, (w, u, v))
+    key[start] = 0
 
-        # voisins entrants (non orienté)
-        for v in G.predecessors(u):
-            edges = G.get_edge_data(v, u)
-            if edges:
-                w = min(ed.get(weight, 1) for ed in edges.values())
-                heapq.heappush(pq, (w, u, v))
+    # File de priorité : (clé, u, v)
+    # u = parent, v = node
+    queue = [(0, None, start)]
 
-    push_edges_from(start_node)
+    def get_weight(u, v):
+        data = G.get_edge_data(u, v)
+        if isinstance(data, dict):
+            return min(d.get(weight, 1) for d in data.values())
+        return data.get(weight, 1)
 
-    # étape initiale
-    yield {
-        "current_edge": None,
-        "candidate_edge": None,
-        "mst_edges": list(mst_edges),
-        "visited_nodes": set(visited),
-        "total_cost": total_cost
-    }
+    # Boucle principale
+    while queue:
+        queue.sort(key=lambda x: x[0])
+        k, u, v = queue.pop(0)
 
-    while pq and len(visited) < len(nodes):
-        w, u, v = heapq.heappop(pq)
-
-        # étape candidate
+        # Étape : avant d'ajouter v
         yield {
-            "current_edge": None,
-            "candidate_edge": (u, v, w),
+            "current_node": v,
+            "current_edge": (u, v, k) if u is not None else None,
             "mst_edges": list(mst_edges),
-            "visited_nodes": set(visited),
-            "total_cost": total_cost
+            "visited": set(visited),
+            "key": dict(key),
+            "parent": dict(parent),
+            "queue": list(queue)
         }
 
-        # ignorer si déjà dans l'arbre
-        if u in visited and v in visited:
+        if v in visited:
             continue
 
-        # normalisation
-        if u not in visited and v in visited:
-            u, v = v, u
+        visited.add(v)
 
-        if u in visited and v not in visited:
-            visited.add(v)
-            mst_edges.append((u, v, w))
-            total_cost += w
+        if u is not None:
+            mst_edges.append((u, v, k))
 
-            # étape acceptation
-            yield {
-                "current_edge": (u, v, w),
-                "candidate_edge": None,
-                "mst_edges": list(mst_edges),
-                "visited_nodes": set(visited),
-                "total_cost": total_cost
-            }
+        # Mise à jour des voisins
+        for w in G.neighbors(v):
+            if w not in visited:
+                w_weight = get_weight(v, w)
+                if w_weight < key[w]:
+                    key[w] = w_weight
+                    parent[w] = v
+                    queue.append((w_weight, v, w))
 
-            push_edges_from(v)
+        # Étape après mise à jour
+        yield {
+            "current_node": v,
+            "current_edge": (u, v, k) if u is not None else None,
+            "mst_edges": list(mst_edges),
+            "visited": set(visited),
+            "key": dict(key),
+            "parent": dict(parent),
+            "queue": list(queue)
+        }
 
-    # étape finale
+    # Étape finale
     yield {
+        "current_node": None,
         "current_edge": None,
-        "candidate_edge": None,
         "mst_edges": list(mst_edges),
-        "visited_nodes": set(visited),
-        "total_cost": total_cost
+        "visited": set(visited),
+        "key": dict(key),
+        "parent": dict(parent),
+        "queue": []
     }
 
 
 # ---------------------------------------------------------
 # Affichage dynamique étape par étape (Prim)
 # ---------------------------------------------------------
-def plot_prim_step(G, step):
+def plot_prim_step(G, step, is_test_graph=False):
 
-    current = step.get("current_edge")
-    candidate = step.get("candidate_edge")
-    mst_edges = step.get("mst_edges", [])
-    visited_nodes = step.get("visited_nodes", set())
+    def xy(n):
+        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+            return G.nodes[n]['x'], G.nodes[n]['y']
+        return None, None
+
+    mst_edges = step["mst_edges"]
+    visited = step["visited"]
+    current = step["current_edge"]
 
     # --- Arrière-plan ---
-    all_edge_x, all_edge_y = [], []
+    all_x, all_y = [], []
     for u, v in G.edges():
-        all_edge_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        all_edge_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        all_x += [x0, x1, None]
+        all_y += [y0, y1, None]
 
-    bg_edges = go.Scatter(
-        x=all_edge_x, y=all_edge_y,
+    bg = go.Scatter(
+        x=all_x, y=all_y,
         mode="lines",
         line=dict(width=1.5, color="#A0A0A0"),
         hoverinfo="none"
     )
 
-    # --- MST (vert) ---
+    # --- Arêtes MST ---
     mst_x, mst_y = [], []
     for u, v, w in mst_edges:
-        mst_x += [G.nodes[u]['x'], G.nodes[v]['x'], None]
-        mst_y += [G.nodes[u]['y'], G.nodes[v]['y'], None]
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        mst_x += [x0, x1, None]
+        mst_y += [y0, y1, None]
 
     mst_trace = go.Scatter(
         x=mst_x, y=mst_y,
@@ -138,67 +140,137 @@ def plot_prim_step(G, step):
         hoverinfo="none"
     )
 
-    # --- Arête candidate (orange) ---
-    if candidate is not None:
-        u, v, w = candidate
-        cand_trace = go.Scatter(
-            x=[G.nodes[u]['x'], G.nodes[v]['x']],
-            y=[G.nodes[u]['y'], G.nodes[v]['y']],
-            mode="lines",
-            line=dict(width=6, color="orange"),
-            hoverinfo="none"
-        )
-    else:
-        cand_trace = go.Scatter(x=[], y=[])
-
-    # --- Arête courante acceptée (jaune) ---
+    # --- Arête courante ---
     if current is not None:
         u, v, w = current
-        cur_trace = go.Scatter(
-            x=[G.nodes[u]['x'], G.nodes[v]['x']],
-            y=[G.nodes[u]['y'], G.nodes[v]['y']],
-            mode="lines",
-            line=dict(width=7, color="yellow"),
-            hoverinfo="none"
-        )
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is not None and x1 is not None:
+            cur_trace = go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(width=6, color="yellow"),
+                hoverinfo="none"
+            )
+        else:
+            cur_trace = go.Scatter(x=[], y=[])
     else:
         cur_trace = go.Scatter(x=[], y=[])
 
-    # --- Nœuds (style harmonisé) ---
-    node_x, node_y, labels, colors = [], [], [], []
-    for n, data in G.nodes(data=True):
-        node_x.append(data["x"])
-        node_y.append(data["y"])
-        labels.append(str(n))
+    # --- Nœuds ---
+    node_x, node_y, node_color, node_size = [], [], [], []
 
-        if n in visited_nodes:
-            colors.append("#1E90FF")  # bleu vif
+    for n in G.nodes():
+        x, y = xy(n)
+        if x is None:
+            continue
+
+        node_x.append(x)
+        node_y.append(y)
+
+        if n in visited:
+            node_color.append("#1E90FF")
         else:
-            colors.append("black")
+            node_color.append("black")
+
+        if is_test_graph:
+            node_size.append(45)
+        else:
+            node_size.append(10)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
-        text=labels,
-        textposition="top center",
-        marker=dict(
-            size=28,
-            color=colors,
-            line=dict(width=3, color="white")
-        ),
-        textfont=dict(size=14, color="white", family="Arial Black"),
+        mode="markers",
+        marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
         hoverinfo="text"
     )
 
-    fig = go.Figure([bg_edges, mst_trace, cand_trace, cur_trace, node_trace])
+    fig = go.Figure([bg, mst_trace, cur_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600,
         plot_bgcolor="lightblue",
-        paper_bgcolor="lightblue"
+        height=600
+    )
+    return fig
+
+
+def plot_prim_mst(G, mst_edges, is_test_graph=False):
+
+    def xy(n):
+        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+            return G.nodes[n]['x'], G.nodes[n]['y']
+        return None, None
+
+    # --- Arrière-plan ---
+    all_x, all_y = [], []
+    for u, v in G.edges():
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        all_x += [x0, x1, None]
+        all_y += [y0, y1, None]
+
+    bg = go.Scatter(
+        x=all_x, y=all_y,
+        mode="lines",
+        line=dict(width=1.5, color="#A0A0A0"),
+        hoverinfo="none"
     )
 
+    # --- Arêtes MST ---
+    mst_x, mst_y = [], []
+    for u, v, w in mst_edges:
+        x0, y0 = xy(u)
+        x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
+        mst_x += [x0, x1, None]
+        mst_y += [y0, y1, None]
+
+    mst_trace = go.Scatter(
+        x=mst_x, y=mst_y,
+        mode="lines",
+        line=dict(width=6, color="green"),
+        hoverinfo="none"
+    )
+
+    # --- Nœuds ---
+    node_x, node_y, node_color, node_size = [], [], [], []
+
+    for n in G.nodes():
+        x, y = xy(n)
+        if x is None:
+            continue
+
+        node_x.append(x)
+        node_y.append(y)
+
+        if n in {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}:
+            node_color.append("green")
+        else:
+            node_color.append("black")
+
+        node_size.append(45 if is_test_graph else 10)
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers",
+        marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
+        hoverinfo="text"
+    )
+
+    fig = go.Figure([bg, mst_trace, node_trace])
+    fig.update_layout(
+        showlegend=False,
+        margin=dict(l=0, r=0, t=0, b=0),
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False),
+        plot_bgcolor="lightblue",
+        height=600
+    )
     return fig
