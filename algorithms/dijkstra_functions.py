@@ -198,77 +198,89 @@ def dijkstra_complete(G, start, end=None):
 # ---------------------------------------------------------
 # Étape Dijkstra — TOUS les nœuds
 # ---------------------------------------------------------
-def plot_dijkstra_step(G, step, start=None, end=None, is_test_graph=False):
+def plot_dijkstra_step(G, step, start_node, end_node, is_test_graph=False):
 
-    visited = step["visited"]
-    current = step["current"]
-    
-    # Fonction pour obtenir les coordonnées (OSMnx ou graphe de test)
-    def get_coords(node):
-        if 'x' in G.nodes[node] and 'y' in G.nodes[node]:
-            return G.nodes[node]['x'], G.nodes[node]['y']
-        elif 'x' in G.nodes[node]:  # OSMnx utilise x=longitude, y=latitude
-            return G.nodes[node]['x'], G.nodes[node]['y']
-        else:
-            return 0, 0
+    pos = nx.get_node_attributes(G, "pos")
 
-    edge_x, edge_y = [], []
+    fig = go.Figure()
+
+    # --- Arêtes normales ---
     for u, v in G.edges():
-        ux, uy = get_coords(u)
-        vx, vy = get_coords(v)
-        edge_x += [ux, vx, None]
-        edge_y += [uy, vy, None]
+        fig.add_trace(go.Scatter(
+            x=[pos[u][0], pos[v][0]],
+            y=[pos[u][1], pos[v][1]],
+            mode="lines",
+            line=dict(color="#e0e0e0", width=2),
+            hoverinfo="none",
+            showlegend=False
+        ))
 
-    edge_trace = go.Scatter(
-        x=edge_x, y=edge_y,
-        mode="lines",
-        line=dict(width=1, color="#ddd"),
-        hoverinfo="none"
-    )
+    # --- Arêtes relaxées (orange) ---
+    for u, v in step["relaxed_edges"]:
+        fig.add_trace(go.Scatter(
+            x=[pos[u][0], pos[v][0]],
+            y=[pos[u][1], pos[v][1]],
+            mode="lines",
+            line=dict(color="orange", width=4),
+            hoverinfo="none",
+            showlegend=False
+        ))
 
-    node_x, node_y, node_color, node_size, labels = [], [], [], [], []
+    # --- Arêtes du chemin final (vert) ---
+    for u, v in step["path_edges"]:
+        fig.add_trace(go.Scatter(
+            x=[pos[u][0], pos[v][0]],
+            y=[pos[u][1], pos[v][1]],
+            mode="lines",
+            line=dict(color="green", width=6),
+            hoverinfo="none",
+            showlegend=False
+        ))
+
+    # --- Nœuds ---
+    node_x, node_y, node_color, node_size = [], [], [], []
 
     for n in G.nodes():
-        nx_coord, ny_coord = get_coords(n)
-        node_x.append(nx_coord)
-        node_y.append(ny_coord)
-        labels.append(str(n))
+        node_x.append(pos[n][0])
+        node_y.append(pos[n][1])
 
-        if n == current:
-            node_color.append("yellow")
-            node_size.append(45)
-        elif n == start:
+        # Couleurs
+        if n == start_node:
             node_color.append("green")
-            node_size.append(40)
-        elif n == end:
+        elif n == end_node:
             node_color.append("red")
-            node_size.append(40)
-        elif n in visited:
-            node_color.append("blue")
-            node_size.append(38)
+        elif n in step["visited"]:
+            node_color.append("#1E90FF")
         else:
-            node_color.append("lightgray")
-            node_size.append(35)
+            node_color.append("black")
 
-    node_trace = go.Scatter(
+        # Taille (OSM plus petit)
+        if is_test_graph:
+            node_size.append(45)
+        else:
+            node_size.append(12)
+
+    fig.add_trace(go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
-        text=labels if is_test_graph else None,
-        textposition="middle center",
-        marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
-        textfont=dict(size=9, color="white", family="Arial Black"),
-        hoverinfo="text"
-    )
+        mode="markers+text" if is_test_graph else "markers",
+        text=[str(n) for n in G.nodes()] if is_test_graph else None,
+        textposition="top center",
+        marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
+        textfont=dict(size=14, color="white", family="Arial Black"),
+        hoverinfo="text",
+        showlegend=False
+    ))
 
-    fig = go.Figure([edge_trace, node_trace])
     fig.update_layout(
-        showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600
+        plot_bgcolor="lightblue",
+        paper_bgcolor="lightblue"
     )
+
     return fig
+
 
 
 # ---------------------------------------------------------
@@ -283,15 +295,17 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
     
     # Fonction pour obtenir les coordonnées
     def get_coords(node):
-        if 'x' in G.nodes[node] and 'y' in G.nodes[node]:
+        if node in G.nodes and 'x' in G.nodes[node] and 'y' in G.nodes[node]:
             return G.nodes[node]['x'], G.nodes[node]['y']
-        else:
-            return 0, 0
+        return None, None   # sécurité anti-KeyError
 
+    # --- Arêtes ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         ux, uy = get_coords(u)
         vx, vy = get_coords(v)
+        if ux is None or vx is None:
+            continue  # sécurité anti-KeyError
         all_edge_x += [ux, vx, None]
         all_edge_y += [uy, vy, None]
 
@@ -302,30 +316,48 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
         hoverinfo="none"
     )
 
+    # --- Nœuds ---
     node_x, node_y, node_color, node_size, labels = [], [], [], [], []
 
     for n in highlight:
         nx_coord, ny_coord = get_coords(n)
+        if nx_coord is None:
+            continue  # sécurité anti-KeyError
+
         node_x.append(nx_coord)
         node_y.append(ny_coord)
         labels.append(str(n))
 
+        # Couleurs
         if n == current:
             node_color.append("yellow")
-            node_size.append(55)
         elif n == start:
             node_color.append("green")
-            node_size.append(50)
         elif n == end:
             node_color.append("red")
-            node_size.append(50)
         else:
             node_color.append("blue")
-            node_size.append(48)
+
+        # Tailles (test graph = gros, OSM = petit)
+        if is_test_graph:
+            if n == current:
+                node_size.append(55)
+            elif n in {start, end}:
+                node_size.append(50)
+            else:
+                node_size.append(48)
+        else:
+            # OSM → tailles réduites
+            if n == current:
+                node_size.append(22)
+            elif n in {start, end}:
+                node_size.append(18)
+            else:
+                node_size.append(14)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode="markers+text",
+        mode="markers+text" if is_test_graph else "markers",
         text=labels if is_test_graph else None,
         textposition="middle center",
         marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
@@ -343,6 +375,7 @@ def plot_dijkstra_step_dynamic(G, step, start=None, end=None, is_test_graph=Fals
         height=600
     )
     return fig
+
 
 
 # ---------------------------------------------------------
@@ -379,16 +412,17 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
 
     # Fonction pour obtenir les coordonnées
     def xy(n):
-        if 'x' in G.nodes[n] and 'y' in G.nodes[n]:
+        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
             return G.nodes[n]['x'], G.nodes[n]['y']
-        else:
-            return 0, 0
+        return None, None   # sécurité anti-KeyError
 
     # --- Toutes les arêtes en arrière-plan ---
     all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
         x1, y1 = xy(v)
+        if x0 is None or x1 is None:
+            continue
         all_edge_x += [x0, x1, None]
         all_edge_y += [y0, y1, None]
 
@@ -406,6 +440,8 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
             u, v = path[i], path[i + 1]
             x0, y0 = xy(u)
             x1, y1 = xy(v)
+            if x0 is None or x1 is None:
+                continue
             path_edge_x += [x0, x1, None]
             path_edge_y += [y0, y1, None]
 
@@ -424,6 +460,9 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
             if G.has_edge(u, v):
                 x0, y0 = xy(u)
                 x1, y1 = xy(v)
+                if x0 is None or x1 is None:
+                    continue
+
                 edge_data = G.get_edge_data(u, v)
                 if isinstance(edge_data, dict):
                     w = min(d.get('length', 1) for d in edge_data.values())
@@ -450,6 +489,9 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
             continue
 
         x, y = xy(n)
+        if x is None:
+            continue
+
         node_x.append(x)
         node_y.append(y)
 
@@ -465,22 +507,38 @@ def plot_final_path_dijkstra(G, step, start, end, is_test_graph=False):
         else:
             labels.append(str(n))
 
-        # Couleurs et tailles
+        # --- Couleurs identiques à ton style ---
         if n == start:
             node_color.append("green")
-            node_size.append(60)
         elif n == end:
             node_color.append("red")
-            node_size.append(60)
         elif n in path:
             node_color.append("orange")
-            node_size.append(55)
         elif d != math.inf:
             node_color.append("#031E66")
-            node_size.append(50)
         else:
             node_color.append("#444444")
-            node_size.append(48)
+
+        # --- Tailles adaptées selon le graphe ---
+        if is_test_graph:
+            if n in {start, end}:
+                node_size.append(60)
+            elif n in path:
+                node_size.append(55)
+            elif d != math.inf:
+                node_size.append(50)
+            else:
+                node_size.append(48)
+        else:
+            # OSM → tailles réduites
+            if n in {start, end}:
+                node_size.append(22)
+            elif n in path:
+                node_size.append(18)
+            elif d != math.inf:
+                node_size.append(16)
+            else:
+                node_size.append(14)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,

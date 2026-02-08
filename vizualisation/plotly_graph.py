@@ -134,15 +134,29 @@ def plot_graph_with_points(G, start_node, end_node, is_test_graph=False):
         node_y.append(y)
         labels.append(str(n))
 
-        if n == start_node:
-            node_color.append("green")
-            node_size.append(55)
-        elif n == end_node:
-            node_color.append("red")
-            node_size.append(55)
+        if is_test_graph:
+    # tailles normales pour graphe de test
+            if n == start_node:
+                node_color.append("green")
+                node_size.append(55)
+            elif n == end_node:
+                node_color.append("red")
+                node_size.append(55)
+            else:
+                node_color.append("black")
+                node_size.append(45)
         else:
-            node_color.append("black")  # même style que final_path
-            node_size.append(45)
+            # tailles réduites pour OSM
+            if n == start_node:
+                node_color.append("green")
+                node_size.append(20)
+            elif n == end_node:
+                node_color.append("red")
+                node_size.append(20)
+            else:
+                node_color.append("black")
+                node_size.append(12)
+
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
