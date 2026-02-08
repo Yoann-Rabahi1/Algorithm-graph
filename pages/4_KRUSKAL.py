@@ -2,8 +2,8 @@ import streamlit as st
 import time
 
 from graphs.download_graph import *
-from kruskal_functions import *
-from plotly_graph import *
+from algorithms.kruskal_functions import *
+from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="Kruskal - MST", layout="wide")
 

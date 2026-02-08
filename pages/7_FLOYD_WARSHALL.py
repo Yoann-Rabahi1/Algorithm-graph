@@ -2,8 +2,8 @@ import streamlit as st
 import time
 
 from graphs.download_graph import create_french_cities_graph
-from plotly_graph import plot_fw_pair, plot_fw_path
-from floyd_warshall_functions import floyd_warshall_steps, reconstruct_path_from_step
+from vizualisation.plotly_graph import plot_fw_pair, plot_fw_path
+from algorithms.floyd_warshall_functions import floyd_warshall_steps, reconstruct_path_from_step
 
 st.set_page_config(page_title="Floyd Warshall", layout="wide")
 st.title("🔁 Floyd-Warshall, plus courts chemins entre tous les couples")

@@ -2,9 +2,9 @@ import os
 import numpy as np
 import streamlit as st
 import time
-from plotly_graph import *
+from vizualisation.plotly_graph import *
 from graphs.download_graph import *  
-from dijkstra_functions import *
+from algorithms.dijkstra_functions import *
 
 st.set_page_config(page_title="Parcours de Graphes - Dijkstra", layout="wide")
 st.title("🗺️ Visualisation de l'algorithme de Dijkstra")

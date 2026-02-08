@@ -2,8 +2,8 @@ import streamlit as st
 import time
 
 from graphs.download_graph import create_french_cities_graph
-from prim_functions import *
-from plotly_graph import *
+from algorithms.prim_functions import *
+from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="Prim - MST", layout="wide")
 

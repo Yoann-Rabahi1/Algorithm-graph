@@ -1,9 +1,9 @@
 import streamlit as st
 import time
-from dfs_functions import plot_dfs_step, dfs_steps
+from algorithms.dfs_functions import plot_dfs_step, dfs_steps
 from graphs.download_graph import create_french_cities_graph
 
-from plotly_graph import *
+from vizualisation.plotly_graph import *
 
 st.set_page_config(page_title="DFS - Parcours en Profondeur", layout="wide")
 

@@ -3,7 +3,7 @@ import time
 import math
 
 from graphs.download_graph import *
-from bellman_ford_functions import *
+from algorithms.bellman_ford_functions import *
 
 st.set_page_config(page_title="Bellman Ford", layout="wide")
 

@@ -1,7 +1,7 @@
 import streamlit as st
 import time
 
-from pert_functions import build_pert_graph, pert_compute_steps, plot_pert_step
+from algorithms.pert_functions import build_pert_graph, pert_compute_steps, plot_pert_step
 
 st.set_page_config(page_title="PERT", layout="wide")
 
