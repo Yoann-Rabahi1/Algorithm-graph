@@ -1,17 +1,26 @@
 import streamlit as st
 import time
 import math
+import pandas as pd
 
 from graphs.download_graph import *
 from algorithms.bellman_ford_functions import *
+from vizualisation.plotly_graph import *
 
-st.set_page_config(page_title="Bellman Ford", layout="wide")
+st.set_page_config(page_title="Bellman-Ford", layout="wide")
 
-st.title("🧭 Bellman Ford, plus courts chemins")
+# -----------------------------------------------------------
+# TITRE + INTRO
+# -----------------------------------------------------------
+st.title("🧭 Algorithme de Bellman-Ford — Plus courts chemins")
 
 st.markdown("""
-Bellman Ford calcule les plus courts chemins depuis une source.
-Il supporte les poids négatifs et peut détecter un cycle négatif.
+Cette page reprend la même mise en page que Kruskal, mais adaptée à Bellman-Ford :
+
+- tableau unique des distances (colonnes = nœuds, lignes = itérations)  
+- EXACTEMENT |V|-1 itérations  
+- détection de cycle négatif  
+- affichage final du graphe et du chemin optimal  
 """)
 
 # -----------------------------------------------------------
@@ -20,14 +29,15 @@ Il supporte les poids négatifs et peut détecter un cycle négatif.
 for key, default in {
     "graph": None,
     "node_list": [],
-    "steps": [],
-    "step_index": 0,
-    "running": False,
-    "paused": False,
-    "finished": False,
-    "start_node": None,
-    "end_node": None,
-    "start_time": None
+    "dist": None,
+    "parent": None,
+    "neg_cycle": False,
+    "iterations": [],
+    "source": None,
+    "target": None,
+    "computed": False,
+    "start_time": None,
+    "elapsed": None
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -38,9 +48,10 @@ for key, default in {
 with st.sidebar:
     st.header("⚙️ Configuration")
 
-    if st.button("📥 Charger le graphe des métropoles", type="primary"):
+    if st.button("📥 Charger le graphe Bellman-Ford", type="primary"):
         st.session_state.graph = create_bellman_ford_graph()
         st.session_state.node_list = list(st.session_state.graph.nodes())
+        st.session_state.computed = False
         st.success("Graphe chargé !")
         st.rerun()
 
@@ -49,7 +60,6 @@ with st.sidebar:
 
         nodes = st.session_state.node_list
 
-        # Sélection de la source
         start_idx = st.selectbox(
             "Source",
             range(len(nodes)),
@@ -57,7 +67,6 @@ with st.sidebar:
             index=0
         )
 
-        # Sélection de la cible, mais sans proposer la même valeur
         possible_targets = [i for i in range(len(nodes)) if i != start_idx]
 
         end_idx = st.selectbox(
@@ -67,188 +76,124 @@ with st.sidebar:
             index=0
         )
 
-        st.session_state.start_node = nodes[start_idx]
-        st.session_state.end_node = nodes[end_idx]
-
-
-        st.subheader("⚡ Vitesse")
-        speed = st.slider("Délai entre étapes (sec)", 0.01, 1.0, 0.2, 0.01)
-
-        st.subheader("👁️ Options")
-        show_all = st.checkbox("Afficher tous les noeuds", value=False)
+        st.session_state.source = nodes[start_idx]
+        st.session_state.target = nodes[end_idx]
 
 # -----------------------------------------------------------
 # CONTROLS
 # -----------------------------------------------------------
 st.header("🎮 Contrôles")
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2 = st.columns(2)
 
 with col1:
-    if st.button("▶️ Démarrer", disabled=st.session_state.running):
-        if st.session_state.graph is None:
-            st.error("Charge d'abord un graphe.")
-        else:
-            st.session_state.running = True
-            st.session_state.paused = False
-            st.session_state.finished = False
-            st.session_state.step_index = 0
-            st.session_state.start_time = time.time()
+    if st.button("▶️ Calculer Bellman-Ford", disabled=st.session_state.graph is None):
+        st.session_state.start_time = time.time()
 
-            st.session_state.steps = list(
-                bellman_ford_steps(
-                    st.session_state.graph,
-                    st.session_state.start_node,
-                    weight="length"
-                )
-            )
-            st.rerun()
+        dist, parent, neg_cycle, iterations = bellman_ford_run(
+            st.session_state.graph,
+            st.session_state.source,
+            weight="length"
+        )
+
+        st.session_state.dist = dist
+        st.session_state.parent = parent
+        st.session_state.neg_cycle = neg_cycle
+        st.session_state.iterations = iterations
+        st.session_state.computed = True
+        st.session_state.elapsed = time.time() - st.session_state.start_time
+        st.rerun()
 
 with col2:
-    if st.button("⏸️ Pause", disabled=not st.session_state.running or st.session_state.paused):
-        st.session_state.paused = True
-        st.rerun()
-
-with col3:
-    if st.button("▶️ Reprendre", disabled=not st.session_state.paused):
-        st.session_state.paused = False
-        st.rerun()
-
-with col4:
-    if st.button("⏩ Étape", disabled=not st.session_state.paused):
-        st.session_state.step_index += 1
-        st.rerun()
-
-with col5:
-    if st.button("⏹️ Stop"):
-        st.session_state.running = False
-        st.session_state.paused = False
-        st.session_state.finished = False
-        st.session_state.step_index = 0
-        st.session_state.steps = []
+    if st.button("🧹 Reset"):
+        for key in ["dist", "parent", "neg_cycle", "iterations", "computed", "elapsed"]:
+            st.session_state[key] = None
         st.rerun()
 
 # -----------------------------------------------------------
 # STATUS
 # -----------------------------------------------------------
-if st.session_state.steps:
+if st.session_state.computed:
     colA, colB, colC = st.columns(3)
 
     with colA:
-        if st.session_state.finished:
-            st.success("Terminé")
-        elif st.session_state.paused:
-            st.warning("En pause")
-        elif st.session_state.running:
-            st.info("En cours...")
+        if st.session_state.neg_cycle:
+            st.error("Cycle négatif détecté")
+        else:
+            st.success("Calcul terminé")
 
     with colB:
-        progress = st.session_state.step_index / len(st.session_state.steps)
-        st.metric("Progression", f"{st.session_state.step_index}/{len(st.session_state.steps)}")
-        st.progress(min(1.0, progress))
+        st.metric("Itérations", f"{len(st.session_state.iterations)} / {len(st.session_state.node_list)-1}")
 
     with colC:
-        if st.session_state.start_time:
-            elapsed = time.time() - st.session_state.start_time
-            st.metric("Temps écoulé", f"{elapsed:.2f} sec")
+        st.metric("Temps écoulé", f"{st.session_state.elapsed:.2f} sec")
 
 # -----------------------------------------------------------
-# VISUALISATION
+# TABLEAU DES DISTANCES
 # -----------------------------------------------------------
+if st.session_state.computed:
 
-st.header("📊 Visualisation")
-graph_placeholder = st.empty()
+    st.header("📘 Évolution des distances")
 
-if st.session_state.graph is not None:
+    nodes = st.session_state.node_list
+    table = []
 
-    # --- MODE ANIMATION ---
-    if st.session_state.running and not st.session_state.paused:
+    for snapshot in st.session_state.iterations:
+        row = []
+        for n in nodes:
+            d = snapshot.get(n, math.inf)
+            row.append(d if d != math.inf else None)
+        table.append(row)
 
-        if st.session_state.step_index < len(st.session_state.steps):
-            step = st.session_state.steps[st.session_state.step_index]
+    df = pd.DataFrame(table, columns=nodes)
+    df.index = [f"it {i+1}" for i in range(len(table))]
 
-            fig = plot_bellman_ford_step(
-                st.session_state.graph,
-                step,
-                source=st.session_state.start_node,
-                target=st.session_state.end_node,
-                show_all_nodes=show_all if "show_all" in locals() else False
-            )
-            graph_placeholder.plotly_chart(fig, use_container_width=True)
+    st.dataframe(df, use_container_width=True)
 
-            time.sleep(speed)
-            st.session_state.step_index += 1
-            st.rerun()
+# -----------------------------------------------------------
+# VISUALISATION FINALE
+# -----------------------------------------------------------
+if st.session_state.computed:
 
-        else:
-            st.session_state.running = False
-            st.session_state.finished = True
-            st.rerun()
+    st.header("📊 Visualisation finale")
 
-    # --- MODE PAUSE / INTERMÉDIAIRE ---
-    elif st.session_state.steps and not st.session_state.finished:
+    final_step = {
+        "dist": st.session_state.dist,
+        "parent": st.session_state.parent
+    }
 
-        step = st.session_state.steps[min(
-            st.session_state.step_index,
-            len(st.session_state.steps) - 1
-        )]
+    fig = plot_bellman_ford_final_path(
+        st.session_state.graph,
+        final_step,
+        st.session_state.source,
+        st.session_state.target
+    )
 
-        fig = plot_bellman_ford_step(
-            st.session_state.graph,
-            step,
-            source=st.session_state.start_node,
-            target=st.session_state.end_node,
-            show_all_nodes=show_all if "show_all" in locals() else False
-        )
-        graph_placeholder.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
-        # Infos d’étape
-        phase = step.get("phase")
-        if phase:
-            st.info(f"Phase : {phase}, itération : {step.get('iter')}")
+    # Résultat numérique
+    tgt = st.session_state.target
+    dist = st.session_state.dist
 
-        if step.get("neg_cycle"):
-            st.error("Cycle négatif détecté : distances non fiables.")
-
-    # --- MODE FIN : AFFICHAGE DU CHEMIN FINAL ---
-    elif st.session_state.finished:
-
-        final_step = st.session_state.steps[-1]
-
-        fig = plot_bellman_ford_final_path(
-            st.session_state.graph,
-            final_step,
-            st.session_state.start_node,
-            st.session_state.end_node
-        )
-        graph_placeholder.plotly_chart(fig, use_container_width=True)
-
-        # Résultat numérique
-        dist = final_step["dist"]
-        tgt = st.session_state.end_node
-
-        if final_step.get("neg_cycle"):
-            st.error("Cycle négatif détecté : distances non fiables.")
-        elif dist[tgt] == math.inf:
-            st.warning("Aucun chemin vers la cible.")
-        else:
-            st.success(f"Distance minimale : {dist[tgt]:.2f}")
-
-        # Temps total
-        if st.session_state.start_time:
-            elapsed = time.time() - st.session_state.start_time
-            st.info(f"⏱️ Temps total d'exécution : {elapsed:.2f} sec")
-
-    # --- MODE INITIAL ---
+    if st.session_state.neg_cycle:
+        st.error("Cycle négatif détecté : distances non fiables.")
+    elif dist[tgt] == math.inf:
+        st.warning("Aucun chemin vers la cible.")
     else:
-        st.info("Clique sur ▶️ Démarrer pour lancer Bellman‑Ford.")
+        st.success(f"Distance minimale : **{dist[tgt]:.2f}**")
 
-else:
-    st.warning("Aucun graphe chargé.")
-
-
+# -----------------------------------------------------------
+# FOOTER
+# -----------------------------------------------------------
 st.divider()
 st.markdown("""
-### ℹ️ Bellman Ford
-On relâche toutes les arêtes |V|-1 fois, puis on refait un tour pour détecter un cycle négatif.
+### ℹ️ À propos de Bellman-Ford
+
+Bellman-Ford calcule les plus courts chemins même en présence de **poids négatifs** :
+
+1. relaxation de toutes les arêtes |V|-1 fois  
+2. détection d’un cycle négatif  
+3. reconstruction du chemin final  
+
+Cette page affiche **toutes les distances** puis le **graphe final**.
 """)
