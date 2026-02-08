@@ -98,47 +98,55 @@ def prim_steps(G, start, weight="length"):
 def plot_prim_step(G, step, is_test_graph=False):
 
     def xy(n):
-        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
-            return G.nodes[n]['x'], G.nodes[n]['y']
+        if n in G.nodes and "x" in G.nodes[n] and "y" in G.nodes[n]:
+            return G.nodes[n]["x"], G.nodes[n]["y"]
         return None, None
 
     mst_edges = step["mst_edges"]
     visited = step["visited"]
     current = step["current_edge"]
 
+    fig = go.Figure()
+
     # --- Arrière-plan ---
-    all_x, all_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        all_x += [x0, x1, None]
-        all_y += [y0, y1, None]
-
-    bg = go.Scatter(
-        x=all_x, y=all_y,
-        mode="lines",
-        line=dict(width=1.5, color="#A0A0A0"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=1.5, color="#A0A0A0"),
+            hoverinfo="none"
+        ))
 
     # --- Arêtes MST ---
-    mst_x, mst_y = [], []
     for u, v, w in mst_edges:
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        mst_x += [x0, x1, None]
-        mst_y += [y0, y1, None]
 
-    mst_trace = go.Scatter(
-        x=mst_x, y=mst_y,
-        mode="lines",
-        line=dict(width=6, color="green"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=6, color="green"),
+            hoverinfo="text" if is_test_graph else "none",
+            text=[f"{u} → {v} : {w:.1f}"] if is_test_graph else None
+        ))
+
+        # Poids uniquement pour graphe de test
+        if is_test_graph:
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            fig.add_annotation(
+                x=xm, y=ym,
+                text=f"{w:.1f}",
+                showarrow=False,
+                font=dict(size=16, color="black"),
+                bgcolor="white",
+                opacity=0.8
+            )
 
     # --- Arête courante ---
     if current is not None:
@@ -146,20 +154,29 @@ def plot_prim_step(G, step, is_test_graph=False):
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is not None and x1 is not None:
-            cur_trace = go.Scatter(
-                x=[x0, x1],
-                y=[y0, y1],
+
+            fig.add_trace(go.Scatter(
+                x=[x0, x1], y=[y0, y1],
                 mode="lines",
                 line=dict(width=6, color="yellow"),
-                hoverinfo="none"
-            )
-        else:
-            cur_trace = go.Scatter(x=[], y=[])
-    else:
-        cur_trace = go.Scatter(x=[], y=[])
+                hoverinfo="text" if is_test_graph else "none",
+                text=[f"{u} → {v} : {w:.1f}"] if is_test_graph else None
+            ))
+
+            # Poids de l’arête courante (test graph uniquement)
+            if is_test_graph:
+                xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+                fig.add_annotation(
+                    x=xm, y=ym,
+                    text=f"{w:.1f}",
+                    showarrow=False,
+                    font=dict(size=18, color="black"),
+                    bgcolor="yellow",
+                    opacity=0.9
+                )
 
     # --- Nœuds ---
-    node_x, node_y, node_color, node_size = [], [], [], []
+    node_x, node_y, node_text, node_color, node_size = [], [], [], [], []
 
     for n in G.nodes():
         x, y = xy(n)
@@ -168,25 +185,20 @@ def plot_prim_step(G, step, is_test_graph=False):
 
         node_x.append(x)
         node_y.append(y)
+        node_text.append(str(n))
 
-        if n in visited:
-            node_color.append("#1E90FF")
-        else:
-            node_color.append("black")
+        node_color.append("#1E90FF" if n in visited else "black")
+        node_size.append(45 if is_test_graph else 10)
 
-        if is_test_graph:
-            node_size.append(45)
-        else:
-            node_size.append(10)
-
-    node_trace = go.Scatter(
+    fig.add_trace(go.Scatter(
         x=node_x, y=node_y,
-        mode="markers",
+        mode="markers+text",
+        text=node_text if is_test_graph else None,
+        textposition="top center",
         marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
         hoverinfo="text"
-    )
+    ))
 
-    fig = go.Figure([bg, mst_trace, cur_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -195,52 +207,65 @@ def plot_prim_step(G, step, is_test_graph=False):
         plot_bgcolor="lightblue",
         height=600
     )
+
     return fig
+
+
 
 
 def plot_prim_mst(G, mst_edges, is_test_graph=False):
 
     def xy(n):
-        if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
-            return G.nodes[n]['x'], G.nodes[n]['y']
+        if n in G.nodes and "x" in G.nodes[n] and "y" in G.nodes[n]:
+            return G.nodes[n]["x"], G.nodes[n]["y"]
         return None, None
 
+    fig = go.Figure()
+
     # --- Arrière-plan ---
-    all_x, all_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        all_x += [x0, x1, None]
-        all_y += [y0, y1, None]
-
-    bg = go.Scatter(
-        x=all_x, y=all_y,
-        mode="lines",
-        line=dict(width=1.5, color="#A0A0A0"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=1.5, color="#A0A0A0"),
+            hoverinfo="none"
+        ))
 
     # --- Arêtes MST ---
-    mst_x, mst_y = [], []
     for u, v, w in mst_edges:
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        mst_x += [x0, x1, None]
-        mst_y += [y0, y1, None]
 
-    mst_trace = go.Scatter(
-        x=mst_x, y=mst_y,
-        mode="lines",
-        line=dict(width=6, color="green"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=6, color="green"),
+            hoverinfo="text" if is_test_graph else "none",
+            text=[f"{u} → {v} : {w:.1f}"] if is_test_graph else None
+        ))
+
+        # Poids uniquement pour graphe de test
+        if is_test_graph:
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            fig.add_annotation(
+                x=xm, y=ym,
+                text=f"{w:.1f}",
+                showarrow=False,
+                font=dict(size=16, color="black"),
+                bgcolor="white",
+                opacity=0.8
+            )
 
     # --- Nœuds ---
-    node_x, node_y, node_color, node_size = [], [], [], []
+    node_x, node_y, node_text, node_color, node_size = [], [], [], [], []
+
+    mst_nodes = {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}
 
     for n in G.nodes():
         x, y = xy(n)
@@ -249,22 +274,20 @@ def plot_prim_mst(G, mst_edges, is_test_graph=False):
 
         node_x.append(x)
         node_y.append(y)
+        node_text.append(str(n))
 
-        if n in {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}:
-            node_color.append("green")
-        else:
-            node_color.append("black")
-
+        node_color.append("green" if n in mst_nodes else "black")
         node_size.append(45 if is_test_graph else 10)
 
-    node_trace = go.Scatter(
+    fig.add_trace(go.Scatter(
         x=node_x, y=node_y,
-        mode="markers",
+        mode="markers+text",
+        text=node_text if is_test_graph else None,
+        textposition="top center",
         marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
         hoverinfo="text"
-    )
+    ))
 
-    fig = go.Figure([bg, mst_trace, node_trace])
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
@@ -273,4 +296,5 @@ def plot_prim_mst(G, mst_edges, is_test_graph=False):
         plot_bgcolor="lightblue",
         height=600
     )
+
     return fig

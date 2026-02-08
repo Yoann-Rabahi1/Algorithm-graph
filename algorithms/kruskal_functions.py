@@ -75,63 +75,55 @@ def kruskal_steps(G, weight="length"):
 # ---------------------------------------------------------
 def plot_kruskal_mst(G, mst_edges, is_test_graph=False):
 
-    # Fonction sécurisée pour récupérer les coordonnées
     def xy(n):
         if n in G.nodes and 'x' in G.nodes[n] and 'y' in G.nodes[n]:
             return G.nodes[n]['x'], G.nodes[n]['y']
         return None, None
 
+    fig = go.Figure()
+
     # --- Arrière-plan ---
-    all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        all_edge_x += [x0, x1, None]
-        all_edge_y += [y0, y1, None]
-
-    bg_edges = go.Scatter(
-        x=all_edge_x, y=all_edge_y,
-        mode="lines",
-        line=dict(width=1.5, color="#A0A0A0"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=1.5, color="#A0A0A0"),
+            hoverinfo="none"
+        ))
 
     # --- Arêtes MST ---
-    mst_x, mst_y = [], []
-    weight_labels = []
-
     for u, v, w in mst_edges:
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
 
-        mst_x += [x0, x1, None]
-        mst_y += [y0, y1, None]
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=6, color="green"),
+            hoverinfo="none"
+        ))
 
         if is_test_graph:
-            weight_labels.append(
-                go.Scatter(
-                    x=[(x0 + x1) / 2],
-                    y=[(y0 + y1) / 2],
-                    text=[str(w)],
-                    mode="text",
-                    textfont=dict(size=14, color="black", family="Arial Black"),
-                    hoverinfo="skip"
-                )
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            fig.add_annotation(
+                x=xm, y=ym,
+                text=f"{w:.1f}",
+                showarrow=False,
+                font=dict(size=16, color="black"),
+                bgcolor="white",
+                opacity=0.8
             )
 
-    mst_trace = go.Scatter(
-        x=mst_x, y=mst_y,
-        mode="lines",
-        line=dict(width=6, color="green"),
-        hoverinfo="none"
-    )
-
     # --- Nœuds ---
-    node_x, node_y, labels, node_color, node_size = [], [], [], [], []
+    node_x, node_y, node_text, node_color, node_size = [], [], [], [], []
+
+    mst_nodes = {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}
 
     for n in G.nodes():
         x, y = xy(n)
@@ -140,38 +132,37 @@ def plot_kruskal_mst(G, mst_edges, is_test_graph=False):
 
         node_x.append(x)
         node_y.append(y)
-        labels.append(str(n))
+        node_text.append(str(n))
 
-        node_color.append("black" if n not in {u for u, v, w in mst_edges} else "green")
+        node_color.append("green" if n in mst_nodes else "black")
+        node_size.append(45 if is_test_graph else 10)
 
-        node_size.append(22 if is_test_graph else 10)
-
-    node_trace = go.Scatter(
+    fig.add_trace(go.Scatter(
         x=node_x, y=node_y,
         mode="markers+text" if is_test_graph else "markers",
-        text=labels if is_test_graph else None,
+        text=node_text if is_test_graph else None,
         textposition="top center",
-        marker=dict(size=node_size, color=node_color, line=dict(width=2, color="white")),
-        textfont=dict(size=12, color="white", family="Arial Black"),
+        marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
         hoverinfo="text"
-    )
+    ))
 
-    fig = go.Figure([bg_edges, mst_trace, node_trace] + weight_labels)
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600,
         plot_bgcolor="lightblue",
-        paper_bgcolor="lightblue"
+        height=600
     )
+
     return fig
 
 
 # ---------------------------------------------------------
 # Affichage dynamique étape par étape
 # ---------------------------------------------------------
+import plotly.graph_objects as go
+
 def plot_kruskal_step(G, step, is_test_graph=False):
 
     current = step["current_edge"]
@@ -184,94 +175,101 @@ def plot_kruskal_step(G, step, is_test_graph=False):
             return G.nodes[n]['x'], G.nodes[n]['y']
         return None, None
 
+    fig = go.Figure()
+
     # --- Arrière-plan ---
-    all_edge_x, all_edge_y = [], []
     for u, v in G.edges():
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        all_edge_x += [x0, x1, None]
-        all_edge_y += [y0, y1, None]
-
-    bg_edges = go.Scatter(
-        x=all_edge_x, y=all_edge_y,
-        mode="lines",
-        line=dict(width=1.5, color="#A0A0A0"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=1.5, color="#A0A0A0"),
+            hoverinfo="none"
+        ))
 
     # --- Arêtes visitées ---
-    vis_x, vis_y = [], []
-    weight_labels = []
-
     for u, v, w in visited:
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
 
-        vis_x += [x0, x1, None]
-        vis_y += [y0, y1, None]
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=3, color="orange"),
+            hoverinfo="none"
+        ))
 
+        # Poids uniquement pour graphe de test
         if is_test_graph:
-            weight_labels.append(
-                go.Scatter(
-                    x=[(x0 + x1) / 2],
-                    y=[(y0 + y1) / 2],
-                    text=[str(w)],
-                    mode="text",
-                    textfont=dict(size=14, color="black", family="Arial Black"),
-                    hoverinfo="skip"
-                )
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            fig.add_annotation(
+                x=xm, y=ym,
+                text=f"{w:.1f}",
+                showarrow=False,
+                font=dict(size=14, color="black"),
+                bgcolor="white",
+                opacity=0.8
             )
 
-    visited_trace = go.Scatter(
-        x=vis_x, y=vis_y,
-        mode="lines",
-        line=dict(width=3, color="orange"),
-        hoverinfo="none"
-    )
-
     # --- Arêtes MST ---
-    mst_x, mst_y = [], []
     for u, v, w in mst_edges:
         x0, y0 = xy(u)
         x1, y1 = xy(v)
         if x0 is None or x1 is None:
             continue
-        mst_x += [x0, x1, None]
-        mst_y += [y0, y1, None]
 
-    mst_trace = go.Scatter(
-        x=mst_x, y=mst_y,
-        mode="lines",
-        line=dict(width=6, color="green"),
-        hoverinfo="none"
-    )
+        fig.add_trace(go.Scatter(
+            x=[x0, x1], y=[y0, y1],
+            mode="lines",
+            line=dict(width=6, color="green"),
+            hoverinfo="none"
+        ))
+
+        if is_test_graph:
+            xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+            fig.add_annotation(
+                x=xm, y=ym,
+                text=f"{w:.1f}",
+                showarrow=False,
+                font=dict(size=16, color="black"),
+                bgcolor="white",
+                opacity=0.8
+            )
 
     # --- Arête courante ---
     if current is not None:
         u, v, w = current
         x0, y0 = xy(u)
         x1, y1 = xy(v)
+
         if x0 is not None and x1 is not None:
-            cur_trace = go.Scatter(
-                x=[x0, x1],
-                y=[y0, y1],
+            fig.add_trace(go.Scatter(
+                x=[x0, x1], y=[y0, y1],
                 mode="lines",
                 line=dict(width=6, color="yellow"),
                 hoverinfo="none"
-            )
-        else:
-            cur_trace = go.Scatter(x=[], y=[])
-    else:
-        cur_trace = go.Scatter(x=[], y=[])
+            ))
+
+            if is_test_graph:
+                xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+                fig.add_annotation(
+                    x=xm, y=ym,
+                    text=f"{w:.1f}",
+                    showarrow=False,
+                    font=dict(size=18, color="black"),
+                    bgcolor="yellow",
+                    opacity=0.9
+                )
 
     # --- Nœuds ---
-    node_x, node_y, labels, colors, node_size = [], [], [], [], []
+    node_x, node_y, node_text, node_color, node_size = [], [], [], [], []
 
-    visited_nodes = {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}
+    mst_nodes = {u for u, v, w in mst_edges} | {v for u, v, w in mst_edges}
 
     for n in G.nodes():
         x, y = xy(n)
@@ -280,30 +278,27 @@ def plot_kruskal_step(G, step, is_test_graph=False):
 
         node_x.append(x)
         node_y.append(y)
-        labels.append(str(n))
+        node_text.append(str(n))
 
-        colors.append("#1E90FF" if n in visited_nodes else "black")
+        node_color.append("green" if n in mst_nodes else "black")
+        node_size.append(45 if is_test_graph else 10)
 
-        node_size.append(28 if is_test_graph else 10)
-
-    node_trace = go.Scatter(
+    fig.add_trace(go.Scatter(
         x=node_x, y=node_y,
         mode="markers+text" if is_test_graph else "markers",
-        text=labels if is_test_graph else None,
+        text=node_text if is_test_graph else None,
         textposition="top center",
-        marker=dict(size=node_size, color=colors, line=dict(width=3, color="white")),
-        textfont=dict(size=14, color="white", family="Arial Black"),
+        marker=dict(size=node_size, color=node_color, line=dict(width=3, color="white")),
         hoverinfo="text"
-    )
+    ))
 
-    fig = go.Figure([bg_edges, visited_trace, mst_trace, cur_trace, node_trace] + weight_labels)
     fig.update_layout(
         showlegend=False,
         margin=dict(l=0, r=0, t=0, b=0),
         xaxis=dict(visible=False),
         yaxis=dict(visible=False),
-        height=600,
         plot_bgcolor="lightblue",
-        paper_bgcolor="lightblue"
+        height=600
     )
+
     return fig
